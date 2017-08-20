@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雷门易后台-账单列表</title>
+<link href="css/bootstrap.min.css" rel="stylesheet">
+<link href="css/bootstrap-datepicker.min.css" rel="stylesheet">
+
+<link href="css/styles.css" rel="stylesheet">
+<style type="text/css">
+#status-sel.dropdown-toggle{width: 100px;}
+.navbar-form{padding: 30px 5px 0px; border-bottom: 1px solid #ddd;}
+.navbar-form .tab {float: left; padding: 10px 20px; background-color: #ddd; margin: 0 5px -1px; cursor: pointer; border-top-left-radius: 4px; border-top-right-radius: 4px;}
+.navbar-form .tab.selected {background-color: #337ab7; color: #fff;}
+.table-bill {padding-top: 30px;}
+.bill td{line-height: 30px;}
+.bill.empty {text-align: center; color: #ccc;}
+</style>
+
+<script src="js/jquery-1.11.3.min.js"></script>
+<script src="js/bootstrap.js"></script>
+<script src="js/bootstrap-pagination.js?t=123"></script>
+<script src="js/bootstrap-datepicker.min.js"></script>
+<script src="js/common.js"></script>
+<script src="js/fsapi.js"></script>
+<script type="text/javascript">
+var searchParams = {
+	curpage: 0,
+	pagesize: 20
+}
+var pagination = null;
+var curtab = "unsettled";
+$(document).ready(function(){
+
+	$(".tab").click(function() {
+		var domNext = $(this);
+		if (domNext.hasClass("selected")) {
+			return;
+		};
+
+		var domPre = $(".tab.selected");
+		curtab = domNext.attr("data-type");
+
+		domPre.removeClass("selected");
+		domNext.addClass("selected");
+		$(".table-bill").hide();
+		$(".table-bill."+curtab).show();
+
+	});
+
+	$("#pagination").pagination({
+		curpage: 0,
+		totalitems: 1,
+		countperpage: searchParams.pagesize
+	}).on("changePage", function(e) {
+		searchParams.curpage = e.pageSel;
+		fetchSettledList();
+	});
+	fetchUnsettledList();
+	fetchSettledList();
+})
+
+function fetchUnsettledList() {
+	fsApi.getUnsettledBills({}, function(data){
+		if (data.list.length>0) {
+			data.list[0].date = "今天";
+		};
+		updateList(data, "unsettled");
+	})
+}
+
+function fetchSettledList() {
+	fsApi.getSettledBills(searchParams, function(data){
+		updateList(data, "settled");
+		$("#pagination").pagination({
+			curpage: searchParams.curpage,
+			totalitems: data.total,
+			countperpage: searchParams.pagesize
+		}, "updateUI");
+	})
+}
+
+function updateList(data, type) {
+	$("."+type+" #billlist .bill").remove();
+	var domList = $("."+type+" #billlist");
+	var bills = data.list;
+	var total = data.total;
+
+	for (var i = 0; i < bills.length; i++) {
+		var bill = bills[i];
+		var domLine = $('<tr class="bill"></tr>');
+		if (i == 0) {
+			domLine.append('<td>今天</td>');
+		} else {
+			domLine.append('<td>'+bill.date+'</td>');
+		}
+		domLine.append('<td>'+bill.num+'</td>');
+		domLine.append('<td>'+commonUtils.numberCurrencyFix(bill.pay_sum/100)+'元</td>');
+		domLine.append('<td>'+commonUtils.numberCurrencyFix(bill.plat_sum/100)+'元</td>');
+		domLine.append('<td>'+commonUtils.numberCurrencyFix(bill.master_sum/100)+'元</td>');
+		if (bill.num > 0) {
+			domLine.append('<td><a href="billdetail.html?date='+bill.date+'&t='+(new Date()).getTime()+'" target="_blank">查看详情</a></td>');
+		} else {
+			domLine.append('<td></td>');
+		}
+		domList.append(domLine);
+	};
+}
+</script>
+
+</head>
+<body>
+	<div class="container-fluid">
+		<div class="navbar-form clearfix">
+			<div class="tab selected" data-type="unsettled">未结算账单</div>
+			<div class="tab" data-type="settled">历史账单</div>
+		</div>
+		<div class="table-bill unsettled">
+			<table class="table table-hover">
+				<tbody id="billlist">
+					<tr>
+						<th>日期</th>
+						<th>订单数</th>
+						<th>订单总额</th>
+						<th>平台佣金总额</th>
+						<th>老师结算总额</th>
+						<th>操作</th>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<div class="table-bill settled" style="display:none;">
+			<table class="table table-hover">
+				<tbody id="billlist">
+					<tr>
+						<th>日期</th>
+						<th>订单数</th>
+						<th>订单总额</th>
+						<th>平台佣金总额</th>
+						<th>老师结算总额</th>
+						<th>操作</th>
+					</tr>
+				</tbody>
+			</table>
+			<div class="table-foot">
+				<div class="pagination" id="pagination"></div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雷门易后台-招募列表</title>
+<link href="css/bootstrap.min.css" rel="stylesheet">
+<link href="css/bootstrap-datepicker.min.css" rel="stylesheet">
+
+<link href="css/styles.css" rel="stylesheet">
+<style type="text/css">
+#status-sel.dropdown-toggle{width: 100px;}
+.navbar-form{padding: 30px 5px 5px;}
+.table-recruit {padding-top: 30px;}
+.recruit td{line-height: 30px;}
+.recruit.empty {text-align: center; color: #ccc;}
+</style>
+
+<script src="js/jquery-1.11.3.min.js"></script>
+<script src="js/bootstrap.js"></script>
+<script src="js/bootstrap-pagination.js?t=123"></script>
+<script src="js/bootstrap-datepicker.min.js"></script>
+<script src="js/common.js"></script>
+<script src="js/fsapi.js"></script>
+<script type="text/javascript">
+var searchParams = {
+	audit_status: "",
+	date_start: "",
+	date_end: "",
+	curpage: 0,
+	pagesize: 20
+}
+var audit_status_map = {
+	"ing": "待审核",
+	"approved": "审核通过",
+	"refuse": "审核拒绝"
+}
+var pagination = null;
+$(document).ready(function(){
+	$("#status-sel").dropdown().on("changeSelect", function(e) {
+		searchParams.audit_status = e.value;
+	});
+
+	$("#date-start").datepicker({
+	}).on("changeDate", function(e) {
+		var datetmp = e.date;
+		searchParams.date_start = datetmp.format("yyyy-MM-dd 00:00:00");
+	});
+
+	$("#date-end").datepicker({
+	}).on("changeDate", function(e) {
+		var datetmp = e.date;
+		searchParams.date_end = datetmp.format("yyyy-MM-dd 23:59:59");
+	});
+
+	$("#btn_search").click(function() {
+		searchParams.curpage = 0;
+		fetchList();
+	});
+
+
+	$("#pagination").pagination({
+		curpage: 0,
+		totalitems: 1,
+		countperpage: searchParams.pagesize
+	}).on("changePage", function(e) {
+		searchParams.curpage = e.pageSel;
+		fetchList();
+	});
+	fetchList();
+})
+
+function fetchList() {
+	fsApi.searchRecruits(searchParams, function(data){
+		updateList(data);
+		$("#pagination").pagination({
+			curpage: searchParams.curpage,
+			totalitems: data.total,
+			countperpage: searchParams.pagesize
+		}, "updateUI");
+	})
+}
+
+function updateList(data) {
+	$("#recruitlist .recruit").remove();
+	var domList = $("#recruitlist");
+	var recruits = data.list;
+	var total = data.total;
+
+	if (recruits.length == 0) {
+		var domEmptyLine = $('<tr class="recruit empty"><td colspan="8">没有符合筛选条件的招募申请</td></tr>');
+		domList.append(domEmptyLine);
+		return;
+	};
+
+	for (var i = 0; i < recruits.length; i++) {
+		var recruit = recruits[i];
+		var domLine = $('<tr class="recruit"></tr>');
+		domLine.append('<td>'+recruit.name+'</td>');
+		domLine.append('<td>'+recruit.create_time+'</td>');
+		domLine.append('<td>'+recruit.contact_mobile+'</td>');
+		if (recruit.contact_qq && recruit.contact_qq.length>0) {
+			domLine.append('<td>'+recruit.contact_qq+'</td>');
+		} else {
+			domLine.append('<td>-</td>');
+		}
+		if (recruit.contact_weixin && recruit.contact_weixin.length>0) {
+			domLine.append('<td>'+recruit.contact_weixin+'</td>');
+		} else {
+			domLine.append('<td>-</td>');
+		}
+		domLine.append('<td>'+audit_status_map[recruit.audit_status]+'</td>');
+		if (recruit.audit_time && recruit.audit_time.length>0) {
+			domLine.append('<td>'+recruit.audit_time+'</td>');
+		} else {
+			domLine.append('<td>-</td>');
+		}
+		domLine.append('<td><a href="recruitdetail.html?id='+recruit.id+'&t='+(new Date()).getTime()+'" target="_blank">查看详情</a></td>');
+		domList.append(domLine);
+	};
+
+}
+</script>
+
+</head>
+<body>
+	<div class="container-fluid">
+		<div class="navbar-form" role="search">
+			<div class="form-group">
+				<div class="input-group form-ele">状态:</div>
+				<div class="input-group dropdown form-ele">
+					<button class="btn btn-default dropdown-toggle"  id="status-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="none">全部</span><span class="caret"></span>
+					</button>
+					<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+						<li><a data-value="">全部</a></li>
+						<li><a data-value="ing">待审批</a></li>
+						<li><a data-value="approved">审批通过</a></li>
+						<li><a data-value="refuse">审批拒绝</a></li>
+					</ul>
+				</div>
+				<div class="input-group form-ele">开始日期:</div>
+				<div class="input-group date form-ele">
+					<input type="text" class="form-control" id="date-start" data-date-format="yyyy-mm-dd" data-date-end-date="0d">
+					<div class="input-group-addon">
+					    <span class="glyphicon glyphicon-th"></span>
+					</div>
+				</div>
+				<div class="input-group form-ele">结束日期:</div>
+				<div class="input-group date form-ele">
+					<input type="text" class="form-control" id="date-end" data-date-format="yyyy-mm-dd" data-date-end-date="0d">
+					<div class="input-group-addon">
+					    <span class="glyphicon glyphicon-th"></span>
+					</div>
+				</div>
+			</div>
+			<button type="submit" class="btn btn-default" id="btn_search">筛选</button>
+		</div>
+		<div class="table-recruit">
+			<table class="table table-hover">
+				<tbody id="recruitlist">
+					<tr>
+						<th>申请人姓名</th>
+						<th>申请时间</th>
+						<th>手机号</th>
+						<th>QQ号</th>
+						<th>微信号</th>
+						<th>状态</th>
+						<th>处理时间</th>
+						<th>操作</th>
+					</tr>
+				</tbody>
+			</table>
+			<div class="table-foot">
+				<div class="pagination" id="pagination"></div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

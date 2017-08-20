@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雷门易后台-订单列表</title>
+<link href="css/bootstrap.min.css" rel="stylesheet">
+<link href="css/bootstrap-datepicker.min.css" rel="stylesheet">
+<link href="css/styles.css" rel="stylesheet">
+<style type="text/css">
+.form-search {margin: 20px 0;}
+.form-search .form-group {padding: 8px 0; display: block;}
+#type-sel {width: 120px;}
+#status-sel {width: 120px;}
+#status-pay-sel {width: 80px;}
+
+.order-stat {margin: 15px 0; line-height: 40px; font-size: 16px;}
+.order-stat .number {font-weight: bold; font-size: 24px;}
+
+.table-order {padding-top: 30px;}
+.order td{line-height: 30px;}
+.order.empty {text-align: center; color: #ccc;}
+
+.refund-info {background-color: #f04807; height: 40px; line-height: 40px; color: #fff; padding: 0 15px; margin-top: 5px;}
+.refund-info .btn {margin-left: 30px; height: 30px; line-height: 30px; padding: 0 10px;}
+</style>
+
+<script src="js/jquery-1.11.3.min.js"></script>
+<script src="js/bootstrap.js"></script>
+<script src="js/bootstrap-pagination.js"></script>
+<script src="js/bootstrap-datepicker.min.js"></script>
+<script src="js/common.js?t=5"></script>
+<script src="js/fsapi.js"></script>
+<script type="text/javascript">
+var searchParams = {
+	buy_usr_name: "",
+	seller_usr_name: "",
+	goods_name: "",
+	create_time_start: "",
+	create_time_end: "",
+	status: "default",
+	curpage: 0,
+	pagesize: 20
+};
+$(document).ready(function(){
+	var statusOptions = ["pay_succ", "init", "pay_fail", "completed", "refund_applied", "refunded", "refund_fail", "settlemented", "settlement_fail","close"];
+	var domOptions = $("#status-option");
+	for (var i = 0; i < statusOptions.length; i++) {
+		var status = statusOptions[i];
+		var statusStr = order_status_map[status];
+		var domOption = $('<li><li><a data-value="'+status+'">'+statusStr+'</a></li></li>');
+		domOptions.append(domOption);
+	};
+
+	$("#buy_usr_name").on("input", function(e) {
+		searchParams.buy_usr_name = $("#buy_usr_name").val();
+	});
+	$("#seller_usr_name").on("input", function(e) {
+		searchParams.seller_usr_name = $("#seller_usr_name").val();
+	});
+
+	$("#type-sel").dropdown().on("changeSelect", function(e) {
+		searchParams.goods_name = e.value;
+	});
+	$("#status-sel").dropdown().on("changeSelect", function(e) {
+		searchParams.status = e.value;
+	});
+
+	$("#date-create-start").datepicker({
+	}).on("changeDate", function(e) {
+		var datetmp = e.date;
+		searchParams.create_time_start = datetmp.format("yyyy-MM-dd 00:00:00");
+	});
+
+	$("#date-create-end").datepicker({
+	}).on("changeDate", function(e) {
+		var datetmp = e.date;
+		searchParams.create_time_end = datetmp.format("yyyy-MM-dd 23:59:59");
+	});
+
+	$("#btn_search").click(function() {
+		searchParams.curpage = 0;
+		fetchList();
+	});
+
+	$("#pagination").pagination({
+		curpage: 0,
+		totalitems: 1,
+		countperpage: searchParams.pagesize
+	}).on("changePage", function(e) {
+		searchParams.curpage = e.pageSel;
+		fetchList();
+	});
+	fetchList();
+	countRefunding();
+});
+
+function resetSearch() {
+	$("#buy_usr_name").val("");
+	$("#seller_usr_name").val("");
+
+	var domType = $("#type-sel .value");
+	domType.attr("data-value","");
+	domType.html("全部");
+
+	var domStatus = $("#status-sel .value");
+	domStatus.attr("data-value","default");
+	domStatus.html("默认");
+
+
+	$("#date-create-start").val("");
+	$("#date-create-end").val("");
+	searchParams = {
+		buy_usr_name: "",
+		seller_usr_name: "",
+		goods_name: "",
+		create_time_start: "",
+		create_time_end: "",
+		status: "default",
+		curpage: 0,
+		pagesize: 20
+	};
+}
+
+function countRefunding() {
+	fsApi.countRefundOrder({}, function(data) {
+		if (data.total > 0) {
+			$(".refund-info").show();
+			$("#btn_refund").click(function() {
+				resetSearch();
+				searchParams.status = "refund_applied";
+				var domStatus = $("#status-sel .value");
+				domStatus.attr("data-value","refund_applied");
+				domStatus.html("退款申请中");
+				fetchList();
+			});
+		};
+	});
+}
+
+function fetchList() {
+
+	fsApi.searchConsultOrders(searchParams, function(data){
+		updateList(data);
+		$("#pagination").pagination({
+			curpage: searchParams.curpage,
+			totalitems: data.total,
+			countperpage: searchParams.pagesize
+		}, "updateUI");
+	})
+}
+
+function updateList(data) {
+	$("#orderlist .order").remove();
+	var domList = $("#orderlist");
+	var orders = data.list;
+	var total = data.total;
+
+	var domStat = $(".order-stat");
+	domStat.empty();
+	domStat.append('<span>符合本次查询条件的订单总数为：<span class="number">'+data.total+'</span>，订单总金额为：<span class="number">'+commonUtils.numberCurrencyFix(data.sum_pay/100)+'</span>，平台总佣金为：<span class="number">'+commonUtils.numberCurrencyFix(data.sum_pay*0.3/100)+'</span>，老师税前总收入为：<span class="number">'+commonUtils.numberCurrencyFix(data.sum_pay*0.7/100)+'</span></span>');
+
+	if (orders.length == 0) {
+		var domEmptyLine = $('<tr class="order empty"><td colspan="12">没有符合筛选条件的订单信息</td></tr>');
+		domList.append(domEmptyLine);
+		return;
+	};
+
+	for (var i = 0; i < orders.length; i++) {
+		var order = orders[i];
+		var domLine = $('<tr class="order"></tr>');
+		domLine.append('<td>'+order.order_num+'</td>');
+		domLine.append('<td>'+(order.buy_usr_name?order.buy_usr_name:"匿名客户")+'</td>');
+		domLine.append('<td>'+order.buy_usr_mobile+'</td>');
+		domLine.append('<td>'+order.seller_usr_name+''+(order.seller_usr_nickname?'('+order.seller_usr_nickname+')':'')+'</td>');
+		domLine.append('<td>'+order.goods_name+'</td>');
+		domLine.append('<td>'+(order.order_extra_info!=null?"已填写":'<span style="color:#f00;">未填写</span>')+'</td>');
+		domLine.append('<td>'+order.create_time+'</td>');
+		domLine.append('<td>'+(order.completed_time?order.completed_time:'-')+'</td>');
+		domLine.append('<td>'+commonUtils.numberCurrencyFix(order.pay_rmb_amt/100)+'元</td>');
+		domLine.append('<td>'+commonUtils.numberCurrencyFix(order.pay_rmb_amt*0.3/100)+'</td>');
+		domLine.append('<td>'+commonUtils.numberCurrencyFix(order.pay_rmb_amt*0.7/100)+'</td>');
+		domLine.append('<td>'+order_status_map[order.status]+'</td>');
+		domLine.append(createEvaluateDom(order));
+		domLine.append('<td><a href="orderdetail.html?id='+order.id+'&t='+(new Date()).getTime()+'" target="_blank">查看详情</a></td>');
+		domList.append(domLine);
+
+	};
+}
+
+function createEvaluateDom(order) {
+	var dom = null;
+	if (order.evaluate) {
+		var avg = (parseInt(order.evaluate.resp_speed)+parseInt(order.evaluate.major_level)+parseInt(order.evaluate.service_attitude))/3;
+		dom = $('<td>'+commonUtils.numberCurrencyFix(avg)+'</td>');
+		if (avg<=3) {
+			dom.attr("style", 'color:#f00;');
+		};
+	} else {
+		dom = $('<td>还未评价</td>');
+	}
+	return dom;
+}
+
+</script>
+
+</head>
+<body>
+	
+	<div class="container-fluid">
+		<div class="refund-info" style="display:none;">当前有退款订单<button id="btn_refund" class="btn btn-warning">立即查看</button></div>
+		<div class="form-inline form-search" role="search">
+			<div class="form-group">
+				<div class="input-group form-ele">客户姓名:</div>
+				<input type="text" class="form-control form-ele" id="buy_usr_name">
+				<div class="input-group form-ele">老师姓名:</div>
+				<input type="text" class="form-control form-ele" id="seller_usr_name">
+			</div>
+			<div class="form-group">
+				<div class="input-group form-ele">下单日期:</div>
+				<div class="input-group date form-ele">
+					<input type="text" class="form-control" id="date-create-start" data-date-format="yyyy-mm-dd" data-date-end-date="0d">
+					<div class="input-group-addon">
+					    <span class="glyphicon glyphicon-th"></span>
+					</div>
+				</div>
+				<div class="input-group form-ele">至</div>
+				<div class="input-group date form-ele">
+					<input type="text" class="form-control" id="date-create-end" data-date-format="yyyy-mm-dd" data-date-end-date="0d">
+					<div class="input-group-addon">
+					    <span class="glyphicon glyphicon-th"></span>
+					</div>
+				</div>
+			</div>
+			<div class="form-group">
+				<div class="input-group form-ele">服务项目:</div>
+				<div class="input-group dropdown form-ele">
+					<button class="btn btn-default dropdown-toggle"  id="type-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="全部">全部</span><span class="caret"></span>
+					</button>
+					<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+						<li><a data-value="">全部</a></li>
+						<li><a data-value="流年运势">流年运势</a></li>
+						<li><a data-value="婚恋感情">婚恋感情</a></li>
+						<li><a data-value="健康事业财运">健康事业财运</a></li>
+						<li><a data-value="八字详批">八字详批</a></li>
+						<li><a data-value="结婚吉日">结婚吉日</a></li>
+						<li><a data-value="择日生子">择日生子</a></li>
+						<li><a data-value="开张开市">开张开市</a></li>
+						<li><a data-value="乔迁择日">乔迁择日</a></li>
+						<li><a data-value="个人改名">个人改名</a></li>
+						<li><a data-value="个人起名">个人起名</a></li>
+						<li><a data-value="公司起名">公司起名</a></li>
+						<li><a data-value="办公风水">办公风水</a></li>
+						<li><a data-value="住宅风水">住宅风水</a></li>
+						<li><a data-value="其他">其他</a></li>
+					</ul>
+				</div>
+				<div class="input-group form-ele">订单状态:</div>
+				<div class="input-group dropdown form-ele">
+					<button class="btn btn-default dropdown-toggle"  id="status-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="default">默认</span><span class="caret"></span>
+					</button>
+					<ul class="dropdown-menu" aria-labelledby="dropdownMenu1" id="status-option">
+						<li><a data-value="default">默认</a></li>
+						<li><a data-value="">全部</a></li>
+					</ul>
+				</div>
+			</div>
+			<div class="form-group">
+				<button type="submit" id="btn_search" class="btn btn-default">筛选</button>
+			</div>
+		</div>
+		<div class="order-stat"></div>
+		<div class="table-order">
+			<table class="table table-hover">
+				<tbody id="orderlist">
+					<tr>
+						<th>订单号</th>
+						<th>客户姓名</th>
+						<th>客户手机号</th>
+						<th>老师姓名</th>
+						<th>服务项目</th>
+						<th>预留信息</th>
+						<th>下单时间</th>
+						<th>完成时间</th>
+						<th>订单金额</th>
+						<th>平台佣金</th>
+						<th>结算金额</th>
+						<th>订单状态</th>
+						<th>用户评价</th>
+						<th>操作</th>
+					</tr>
+				</tbody>
+			</table>
+			<div class="table-foot">
+				<div class="pagination" id="pagination"></div>
+			</div>
+		</div>
+</body>
+</html>

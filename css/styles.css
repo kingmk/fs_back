@@ -1,0 +1,36 @@
+
+.clearfix:before,.clearfix:after{content:" ";display:table;}
+.clearfix:after{clear:both}
+.clearfix{*zoom:1}
+
+.nav-pills>li>a {border-radius: 0;}
+
+.main-head {width: 100%; height: 80px; border-bottom: 1px solid #eee; padding: 10px 20px;background-color: #eee; position: relative;}
+.main-head.detail {position: fixed; top: 0;z-index: 1000;}
+
+.main-head .main-admin {float: right; margin-right: 20px; margin-top: 20px;}
+
+.main-menu {width: 200px; position: fixed; top: 80px; left:0; bottom: 0; background-color: #eee;}
+.main-view {position: fixed; top:80px; left:200px; right:0; bottom: 0; overflow: auto; }
+.main-view iframe{width: 100%; height: 99%;border: none;}
+
+.main-view-detail {width: 70%; margin: 20px 15% 40px; background-color: #eee; border-radius: 5px; padding: 30px; box-sizing: border-box; margin-top: 100px;}
+
+
+.foot-opbar{ width: 70%; height: 50px; position: fixed; bottom: 0; left: 15%; right:15%; background-color: #e0e0e0; line-height: 50px; box-sizing:border-box;}
+.foot-opbar .btn {margin-right: 30px;}
+
+.form-ele {display: inline-block; margin: 0 5px; }
+.table .td {word-break:break-all;}
+
+
+.form-line {border-bottom: 1px solid #dadada; font-size: 12px; padding: 5px ;}
+.form-title {width: 110px; float: left; padding-left: 10px; line-height: 30px;}
+.form-desc {width: 150px; float: right; padding-left: 5px; line-height: 30px; font-size: 12px; color: #999; }
+.form-input {margin-left: 110px; margin-right: 150px;}
+.form-input input {border: none; width: 100%; padding: 0 10px; line-height: 30px;}
+.form-input textarea {width: 100%; border: none; padding: 0 10px; line-height: 30px;}
+
+.modal-body .form-line {border: none;}
+.modal-body .form-input input, .modal-body .form-input textarea {border: 1px solid #ccc; border-radius: 4px; }
+.modal-body .form-input .dropdown-toggle {font-size: 12px; width: 120px;}

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雷门易后台-订单列表</title>
+<link href="../css/bootstrap.min.css" rel="stylesheet">
+<link href="../css/bootstrap-datepicker.min.css" rel="stylesheet">
+<link href="../css/styles_h5.css?v=201708191235" rel="stylesheet">
+
+<script src="../js/jquery-1.11.3.min.js"></script>
+<script src="../js/bootstrap.js"></script>
+<script src="../js/bootstrap-pagination.js"></script>
+<script src="../js/bootstrap-datepicker.min.js"></script>
+<script src="../js/common.js?t=5"></script>
+<script src="../js/fsapi.js?v=201708191305"></script>
+
+<style type="text/css">
+#btn_search {position: absolute; bottom: 0; right: 0;}
+.order-stat {margin:20px 0;}
+.order-stat .number {font-weight: bold; color:#337ab7; font-size: 18px;}
+
+.order-list {border-top: 1px solid #dcdcdc; border-bottom: 1px solid #dcdcdc; padding-left: 15px;}
+
+.order-block {width: 100%; border-top: 1px solid #eee; padding: 5px 0; font-size: 12px; color: #999; line-height: 24px; position: relative;}
+.order-block.first {border-top: none;}
+.order-block .user-name {color: #000; font-size: 14px;}
+.order-block .pay-rmb-amt{color: #337ab7; font-size: 14px;}
+.order-block .order-right {position: absolute; right: 15px; top: 5px; line-height: 24px; text-align: right;}
+.order-block .order-right .order-status {color: #337ab7; font-size: 14px;}
+.order-block .order-right .order-eva {color: #337ab7;}
+</style>
+
+<script type="text/javascript">
+var searchParams = {
+	buy_usr_name: "",
+	seller_usr_name: "",
+	goods_name: "",
+	create_time_start: "",
+	create_time_end: "",
+	status: "default",
+	curpage: 0,
+	pagesize: 20
+};
+
+$(document).ready(function() {
+	var statusOptions = ["pay_succ", "init", "pay_fail", "completed", "refund_applied", "refunded", "refund_fail", "settlemented", "settlement_fail","close"];
+	var domOptions = $("#status-option");
+	for (var i = 0; i < statusOptions.length; i++) {
+		var status = statusOptions[i];
+		var statusStr = order_status_map[status];
+		var domOption = $('<li><li><a data-value="'+status+'">'+statusStr+'</a></li></li>');
+		domOptions.append(domOption);
+	};
+
+	$("#date-create-start").datepicker({
+	}).on("changeDate", function(e) {
+		var datetmp = e.date;
+		searchParams.create_time_start = datetmp.format("yyyy-MM-dd 00:00:00");
+	});
+
+	$("#date-create-end").datepicker({
+	}).on("changeDate", function(e) {
+		var datetmp = e.date;
+		searchParams.create_time_end = datetmp.format("yyyy-MM-dd 23:59:59");
+	});
+
+	$("#status-sel").dropdown().on("changeSelect", function(e) {
+		searchParams.status = e.value;
+	});
+
+	$("#btn_search").click(function() {
+		searchParams.curpage = 0;
+		fetchList();
+	});
+
+	$("#pagination").pagination({
+		curpage: 0,
+		totalitems: 1,
+		countperpage: searchParams.pagesize
+	}).on("changePage", function(e) {
+		searchParams.curpage = e.pageSel;
+		fetchList();
+	});
+
+
+	fetchList();
+});
+
+
+function fetchList() {
+
+	fsApi.searchConsultOrders(searchParams, function(data){
+		console.log(data);
+		updateList(data);
+		$("#pagination").pagination({
+			curpage: searchParams.curpage,
+			totalitems: data.total,
+			countperpage: searchParams.pagesize
+		}, "updateUI");
+
+		$("html,body").animate({scrollTop:0}, 100);
+	})
+}
+
+function updateList(data) {
+	var orders = data.list;
+	var domList = $("#orderlist");
+	domList.empty();
+	var domStat = $(".order-stat");
+	domStat.empty();
+	if (orders.length == 0) {
+		domStat.append('没有符合筛选条件的订单信息');
+		return;
+	};
+
+	domStat.append('<div>总金额：<span class="number">'+commonUtils.numberCurrencyFix(data.sum_pay/100)+'</span>；总佣金：<span class="number">'+commonUtils.numberCurrencyFix(data.sum_pay*0.3/100)+'</span></div><div>税前总收入：<span class="number">'+commonUtils.numberCurrencyFix(data.sum_pay*0.7/100)+'</span>；订单数：<span class="number">'+data.total+'</div>');
+
+	for (var i = 0; i < orders.length; i++) {
+		var order = orders[i];
+		var domOrder = createOrderBlock(order);
+		if (i==0) {
+			domOrder.addClass("first");
+		};
+		domList.append(domOrder);
+	}
+
+}
+
+function createOrderBlock(order) {
+	var domOrder = $('<div class="order-block"></div>');
+	var buyername = (order.buy_usr_name?order.buy_usr_name:"匿名客户");
+	var domTmp1 = $('<div><span class="user-name">'+buyername+'</span>（<a class="user-mobile" href="tel://'+order.buy_usr_mobile+'">'+order.buy_usr_mobile+'</a>）咨询&nbsp;<span class="user-name">'+order.seller_usr_name+'</span></div>');
+	domOrder.append(domTmp1);
+	domOrder.append($('<div><span class="goods-name">'+order.goods_name+'</span>&nbsp;|&nbsp;<span class="pay-rmb-amt">'+commonUtils.numberCurrencyFix(order.pay_rmb_amt/100)+'元</span></div>'));
+	domOrder.append($('<div>'+order.create_time.substr(0,16)+'&nbsp;至&nbsp;'+order.completed_time.substr(0,16)+'</div>'));
+
+	domRight = $('<div class="order-right"></div>');
+	var domStatus = $('<div class="order-status">'+order_status_map[order.status]+'</div>');
+	if (order.status == "refunded" || order.status == "refunding") {
+		domStatus.addClass("info-alert");
+	};
+	domRight.append(domStatus);
+	domRight.append(createEvaluateDom(order));
+	if (!order.order_extra_info) {
+		domRight.append($('<div class="info-alert">[资料未填写]</div>'));
+	}
+	domOrder.append(domRight);
+
+	return domOrder;
+}
+
+
+function createEvaluateDom(order) {
+	var dom = null;
+	if (order.evaluate) {
+		var avg = (parseInt(order.evaluate.resp_speed)+parseInt(order.evaluate.major_level)+parseInt(order.evaluate.service_attitude))/3;
+		dom = $('<div class="order-eva">'+commonUtils.numberCurrencyFix(avg)+'</div>');
+		if (avg<=3) {
+			dom.attr("style", 'color:#f00;');
+		};
+	} else {
+		dom = $('<div>还未评价</div>');
+	}
+	return dom;
+}
+</script>
+
+</head>
+
+<body>
+	<div class="container-fluid">
+		<div class="form-group">
+			<div class="form-title">下单日期：</div>
+			<div class="form-input input-group">
+				<input type="text" class="form-control" id="date-create-start" data-date-format="yyyy-mm-dd" data-date-end-date="0d">
+				<div class="input-group-addon">
+				    <span class="glyphicon glyphicon-th"></span>
+				</div>
+			</div>
+		</div>
+		<div class="form-group">
+			<div class="form-title">至：</div>
+			<div class="form-input input-group">
+				<input type="text" class="form-control" id="date-create-end" data-date-format="yyyy-mm-dd" data-date-end-date="0d">
+				<div class="input-group-addon">
+				    <span class="glyphicon glyphicon-th"></span>
+				</div>
+			</div>
+		</div>
+		<div class="form-group">
+			<div class="form-title">订单状态：</div>
+			<div class="form-input input-group dropdown">
+				<button class="btn btn-default dropdown-toggle"  id="status-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="default">默认</span><span class="caret"></span>
+				</button>
+				<ul class="dropdown-menu" aria-labelledby="dropdownMenu1" id="status-option">
+					<li><a data-value="default">默认</a></li>
+					<li><a data-value="">全部</a></li>
+				</ul>
+			</div>
+
+			<button type="submit" id="btn_search" class="btn btn-primary">筛选</button>
+		</div>
+		<div class="order-stat"></div>
+	</div>
+	<div id="orderlist" class="order-list"></div>
+	<div class="pagination" id="pagination"></div>
+
+</body>
+</html>

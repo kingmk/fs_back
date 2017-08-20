@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雷门易后台-老师列表</title>
+<link href="css/bootstrap.min.css" rel="stylesheet">
+
+<link href="css/styles.css" rel="stylesheet">
+<style type="text/css">
+.table-master {padding-top: 30px;}
+.master.empty{text-align: center; color: #ccc;}
+</style>
+
+<script src="js/jquery-1.11.3.min.js"></script>
+<script src="js/bootstrap.js"></script>
+<script src="js/common.js?t=3"></script>
+<script src="js/fsapi.js"></script>
+<script type="text/javascript">
+var searchParams = {
+
+}
+$(document).ready(function(){
+	fetchList();
+})
+
+function fetchList() {
+
+	fsApi.searchMasters(searchParams, function(data){
+		updateList(data);
+		// $("#pagination").pagination({
+		// 	curpage: searchParams.curpage,
+		// 	totalitems: data.total,
+		// 	countperpage: searchParams.pagesize
+		// }, "updateUI");
+	});
+}
+
+function updateList(data) {
+	$("#masterlist .master").remove();
+	var domList = $("#masterlist");
+	var masters = data.list;
+
+	if (masters.length == 0) {
+		var domEmptyLine = $('<tr class="master empty"><td colspan="10">没有符合筛选条件的老师</td></tr>');
+		domList.append(domEmptyLine);
+		return;
+	}
+
+	for (var i = 0; i < masters.length; i++) {
+		var master = masters[i];
+		var domLine = $('<tr class="master"></tr>');
+		domLine.append('<td>'+master.name+''+(master.nick_name?'('+master.nick_name+')':'')+'</td>');
+		domLine.append('<td>'+service_status_map[master.service_status]+'</td>');
+		domLine.append('<td>'+sex_map[master.sex]+'</td>');
+		domLine.append('<td>'+master.contact_mobile+'</td>');
+		domLine.append('<td>'+master.order_total+'</td>');
+		if (master.service_fee && (master.service_fee.refunded || master.service_fee.refunding)) {
+			domLine.append('<td>'+((master.service_fee.refunded?parseInt(master.service_fee.refunded.order_count):0)+(master.service_fee.refunding?parseInt(master.service_fee.refunding.order_count):0))+'</td>');
+		} else {
+			domLine.append('<td>0</td>');
+		}
+
+		if (master.follows && master.follows.follow_count) {
+			domLine.append('<td>'+master.follows.follow_count+'</td>');
+		} else {
+			domLine.append('<td>0</td>');
+		}
+
+		
+		domLine.append('<td>'+getEvaluate(master)+'</td>');
+		domLine.append('<td>'+getServiceFee(master)+'</td>');
+		domLine.append('<td>'+getTags(master).join("，")+'</td>');
+		domLine.append('<td>'+getServicesNames(master)+'</td>');
+		domLine.append('<td><a href="masterdetail.html?id='+master.id+'&t='+(new Date()).getTime()+'" target="_blank">查看详情</a></td>');
+		domList.append(domLine);
+	}
+}
+
+function getEvaluate(master) {
+	var str = "";
+	if (master.evaluate) {
+		str = "响应速度："+commonUtils.numberCurrencyFix(master.evaluate.avg_resp_speed)+"<br/>专业水平："+commonUtils.numberCurrencyFix(master.evaluate.avg_major_level)+"<br/>服务态度："+commonUtils.numberCurrencyFix(master.evaluate.avg_service_attitude)+"<br/>综合评价："+commonUtils.numberCurrencyFix(master.evaluate.avg_com);
+	} else {
+		str = "暂无评价";
+	}
+	return str;
+}
+
+function getServiceFee(master) {
+	var str = "";
+	if (master.service_fee) {
+		var amt_default = 0;
+		var amt_refund = 0;
+		if (master.service_fee.pay_succ) {
+			amt_default += parseInt(master.service_fee.pay_succ.service_fee);
+		};
+		if (master.service_fee.completed) {
+			amt_default += parseInt(master.service_fee.completed.service_fee);
+		};
+		if (master.service_fee.refund_applied) {
+			amt_default += parseInt(master.service_fee.refund_applied.service_fee);
+		};
+		if (master.service_fee.refund_fail) {
+			amt_default += parseInt(master.service_fee.refund_fail.service_fee);
+		};
+		if (master.service_fee.settlemented) {
+			amt_default += parseInt(master.service_fee.settlemented.service_fee);
+		};
+		if (master.service_fee.settlementing) {
+			amt_default += parseInt(master.service_fee.settlementing.service_fee);
+		};
+
+
+		if (master.service_fee.refunding) {
+			amt_refund += parseInt(master.service_fee.refunding.service_fee);
+		};
+		if (master.service_fee.refunded) {
+			amt_refund += parseInt(master.service_fee.refunded.service_fee);
+		};
+
+		str = "订单金额："+commonUtils.numberCurrencyFix(amt_default/100)+"<br/>退款金额："+commonUtils.numberCurrencyFix(amt_refund/100)+"<br/>税前收入："+commonUtils.numberCurrencyFix(amt_default*0.7/100);
+	};
+	return str;
+}
+
+function getTags(master) {
+	var tags = [];
+	if (master.is_sign_other == "N") {
+		tags.push("独家签约");
+	};
+	return tags;
+}
+
+function getServicesNames(master) {
+	var serviceNames= [];
+	if (master.services && master.services.length>0) {
+		for (var i = 0; i < master.services.length; i++) {
+			serviceNames.push(master.services[i].name);
+		};
+	} 
+	return serviceNames.join("，");
+}
+
+</script>
+
+</head>
+<body>
+	<div class="container-fluid">
+		<div class="table-master">
+			<table class="table table-hover">
+				<tbody id="masterlist">
+					<tr>
+						<th style="width:7%">老师姓名</th>
+						<th style="width:7%">服务状态</th>
+						<th style="width:5%">性别</th>
+						<th style="width:9%">联系电话</th>
+						<th style="width:7%">订单数</th>
+						<th style="width:7%">退款数</th>
+						<th style="width:7%">粉丝数</th>
+						<th style="width:11%">评分</th>
+						<th style="width:11%">订单金额</th>
+						<th style="width:8%">标签</th>
+						<th style="width:15%">服务项目</th>
+						<th style="width:7%">操作</th>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+</body>
+</html>

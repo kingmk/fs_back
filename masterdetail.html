@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雷门易后台-老师详情</title>
+<link href="css/bootstrap.min.css" rel="stylesheet">
+
+<link href="css/styles.css?v=20170813" rel="stylesheet">
+<style type="text/css">
+.tabs { position: absolute; left: 450px; bottom: 0; height: 40px; }
+.tabs .tab {height: 40px; padding: 0 15px; line-height: 40px; font-size: 16px; color: #333; float: left; border-top-left-radius: 5px; border-top-right-radius: 5px; cursor: pointer;}
+.tabs .tab.selected{background-color: #337ab7; color: #fff; }
+.iframe-detail {position: fixed; top: 80px; bottom: 0; width: 400px; overflow: hidden; }
+.iframe-detail iframe {width: 100%; height: 99%; border: none;}
+
+
+#form-update, #form-service {margin-left: 410px; width: 500px; background-color: #eee; margin-top: 90px;}
+#form-service {width: 600px;}
+
+
+#form-service .op a{margin-right: 5px; cursor: pointer;}
+
+</style>
+
+<script src="js/jquery-1.11.3.min.js"></script>
+<script src="js/bootstrap.js"></script>
+<script src="js/common.js"></script>
+<script src="js/fsapi.js"></script>
+<script type="text/javascript">
+var masterid;
+var masterdetail;
+var serviceMap = {};
+var cateMap = {};
+var statusStr = {"ON": "服务中", "Off": "未服务"};
+var recommStr = {"Y":"推荐", "N":"未推荐"};
+var cates = [
+	{"id":"100000","name":"流年运势","level":"2"},
+	{"id":"100001","name":"婚恋感情","level":"2"},
+	{"id":"100002","name":"健康事业财运","level":"2"},
+	{"id":"100003","name":"八字详批","level":"2"},
+	{"id":"100004","name":"结婚吉日","level":"2"},
+	{"id":"100005","name":"择日生产","level":"2"},
+	{"id":"100006","name":"开张开市","level":"2"},
+	{"id":"100007","name":"乔迁择日","level":"2"},
+	{"id":"100008","name":"个人改名","level":"2"},
+	{"id":"100009","name":"个人起名","level":"2"},
+	{"id":"100010","name":"公司起名","level":"2"},
+	{"id":"100011","name":"办公风水","level":"2"},
+	{"id":"100012","name":"住宅风水","level":"2"},
+	{"id":"100013","name":"企业战略咨询","level":"2"}
+];
+var formdata = [
+	{name: "nick_name", type: "text"},
+	{name: "sex", type: "text"},
+	{name: "contact_mobile", type: "text"},
+	{name: "contact_qq", type: "text"},
+	{name: "contact_weixin", type: "text"},
+	{name: "work_year", type: "text"},
+	{name: "live_address", type: "text"},
+	{name: "school", type: "textarea"},
+	{name: "experience", type: "textarea"},
+	{name: "achievement", type: "textarea"},
+	{name: "good_at", type: "text"},
+	{name: "profession", type: "text"},
+	{name: "is_full_time", type: "text"},
+	{name: "is_sign_other", type: "text"}
+];
+$(document).ready(function(){
+	masterid = commonUtils.getUrlParamURI("id");
+	var urlDetail = fsApi.serverhost+'/usr/search/master_detail?masterInfoId='+masterid;
+	$("#framedetail").attr("src", urlDetail);
+
+	for (var i = 0; i < cates.length; i++) {
+		var cate = cates[i];
+		cateMap[cate.id] = cate;
+	};
+	initTab();
+	var seltab = commonUtils.getUrlParamURI("seltab");
+	if (seltab == "service") {
+		$("#tab-service").click();
+	};
+	initForm();
+	initModal();
+});
+
+function initTab() {
+	$(".tab").click(function(){
+		if ($(this).hasClass("selected")){
+			return;
+		}
+		var domSelOrg = $(".tab.selected");
+		var tabNameOrg = domSelOrg.attr("id").substr(4);
+
+		var domSelNew = $(this);
+		var tabNameNew = domSelNew.attr("id").substr(4);
+		domSelOrg.removeClass("selected");
+		$("#form-"+tabNameOrg).hide();
+		domSelNew.addClass("selected");
+		$("#form-"+tabNameNew).show();
+
+	})
+}
+
+function initForm() {
+	fsApi.masterDetail({id: masterid}, function(data){
+		var master = data.master;
+		masterdetail = master;
+		initFormUpdate(master);
+		initFormService(master.services);
+	});
+}
+
+function initFormUpdate(master) {
+	for (var i = 0; i < formdata.length; i++) {
+		var datatmp = formdata[i];
+		var dom = $('.form-input [name="'+datatmp.name+'"]');
+		var val = master[datatmp.name];
+		dom.val(val);
+	};
+	if (master.work_date) {
+		var wordDate = new Date(master.work_date.replace(/-/g, '\/'));
+		var diff = (new Date()).getTime()-wordDate.getTime();
+		var diffy = diff/86400000/365;
+		var diffytxt = ""+Math.ceil(Math.round(diffy*10))/10;
+		$('.form-input [name="work_year"]').val(diffytxt);
+	}
+}
+
+function initFormService(services){
+	var domForm = $("#servicelist");
+	for (var i = 0; i < services.length; i++) {
+		var service = services[i];
+		serviceMap[service.fs_zx_cate_id] = service;
+	};
+
+	for (var i = 0; i < cates.length; i++) {
+		var cateid = cates[i].id
+		var service = serviceMap[cateid];
+		var domService = $('<tr class="service"></tr>');
+		domService.append($('<td>'+cates[i].name+'</td>'));
+		var domOp = $('<td class="op"></td>');
+		if ( service) {
+			domService.append($('<td>'+commonUtils.numberCurrencyFix(service.amt/100)+'</td>'));
+			domService.append($('<td>'+statusStr[service.status]+'</td>'));
+			domService.append($('<td>'+recommStr[service.is_plat_recomm]+'</td>'));
+			domOp.append('<a data-toggle="modal" data-target="#modalServiceUpdate" data-cateid="'+cateid+'">编辑服务</a>');
+
+		} else {
+			domService.append($('<td>-</td>'));
+			domService.append($('<td>未服务</td>'));
+			domService.append($('<td>-</td>'));
+			domOp.append('<a data-toggle="modal" data-target="#modalServiceUpdate" data-cateid="'+cateid+'">添加服务</a>');
+		}
+
+		domService.append(domOp);
+		domForm.append(domService);
+	};
+}
+
+function initModal() {
+
+	$("#status-sel").dropdown().on("changeSelect", function(e) {
+		console.log(e);
+	});
+	$("#recomm-sel").dropdown().on("changeSelect", function(e) {
+		console.log(e);
+	});
+	$("#modalServiceUpdate").on("show.bs.modal", function(event) {
+		var dom = $(event.relatedTarget);
+		var domModal = $(this);
+		var name = dom.data("catename");
+		var cateid = dom.data("cateid");
+		var cate = cateMap[cateid];
+		domModal.find("#cateid").val(cateid);
+		if (serviceMap[cateid]) {
+			// has the service
+			var service = serviceMap[cateid];
+			domModal.find(".modal-title").text("编辑服务-"+cate.name);
+			domModal.find("#service-amt").val(service.amt/100);
+			var domStatus = domModal.find("#status-sel .value");
+			domStatus.attr("data-value", service.status);
+			domStatus.text(statusStr[service.status]);
+			var domRecomm = domModal.find("#recomm-sel .value");
+			domRecomm.attr("data-value", service.is_plat_recomm);
+			domRecomm.text(recommStr[service.is_plat_recomm]);
+			domModal.find("#modal-type").val("update");
+			domModal.find("#btnService").text("确认编辑");
+		} else {
+			domModal.find(".modal-title").text("添加服务-"+cate.name);
+			domModal.find("#service-amt").val(0);
+			var domStatus = domModal.find("#status-sel .value");
+			domStatus.attr("data-value", "ON");
+			domStatus.text("服务中");
+			var domRecomm = domModal.find("#recomm-sel .value");
+			domRecomm.attr("data-value", "N");
+			domRecomm.text("未推荐");
+
+			domModal.find("#modal-type").val("create");
+			domModal.find("#btnService").text("确认添加");
+		}
+	});
+
+	$("#btnService").click(function() {
+		var domModal = $("#modalServiceUpdate");
+		var cateid = domModal.find("#cateid").val();
+		var type = domModal.find("#modal-type").val();
+		var amt = domModal.find("#service-amt").val();
+		var status = domModal.find("#status-sel .value").attr("data-value");
+		var is_plat_recomm = domModal.find("#recomm-sel .value").attr("data-value");
+		if (!amt.isFloat() || amt*1 == 0) {
+			alert("请输入服务价格，必须是大于0的数字");
+			return;
+		};
+
+		var params = {
+			cateid: cateid,
+			catename: cateMap[cateid].name,
+			usrid: masterdetail.usr_id,
+			masterid: masterid,
+			type: type,
+			amt: amt*100,
+			status: status,
+			is_plat_recomm: is_plat_recomm
+		}
+		console.log(params);
+		fsApi.updateMasterService(params, function(data){
+			console.log(data);
+			if (data.code == "00") {
+				alert("更新成功");
+				reload("service");
+			} else {
+				alert("更新失败，请稍后重试");
+				reload("service");
+			}
+		})
+	});
+}
+
+
+function checkform(form) {
+	var masterup = {};
+	for (var i = 0; i < formdata.length; i++) {
+		var datatmp = formdata[i];
+		var dom = $('.form-input [name="'+datatmp.name+'"]');
+		var val = dom.val().trim();
+		masterup[datatmp.name] = val;
+	};
+	var rlt = true;
+	if (!masterup.nick_name || masterup.nick_name.length == 0) {
+		alert("昵称必填");
+		rlt = false;
+	} else if (!masterup.sex || (masterup.sex != "M" && masterup.sex !="F")) {
+		alert("性别请填写M或F");
+		rlt = false;
+	} else if (!masterup.contact_mobile || !/[\d]{11}/.test(masterup.contact_mobile)) {
+		alert("手机号请填写11位数字");
+		rlt = false;
+	} else if (!masterup.work_year || !/^\d+(\.\d+)?$/.test(masterup.work_year)) {
+		alert("工作年限必须是数字");
+		rlt = false;
+	} else if (!masterup.is_full_time || (masterup.is_full_time != "Y" && masterup.is_full_time != "N")) {
+		alert("是否全职请填写Y或N");
+		rlt = false;
+	} else if (!masterup.is_sign_other || (masterup.is_sign_other != "Y" && masterup.is_sign_other != "N")) {
+		alert("是否签约其他平台请填写Y或N");
+		rlt = false;
+	}
+
+	masterup.work_date = transferWorkDate(masterup.work_year);
+
+	if (rlt) {
+		masterup.id = masterid;
+		fsApi.updateMaster(masterup, function(data) {
+			console.log(data);
+			if (data.code == "00") {
+				alert("更新成功");
+				reload("detail");
+			} else {
+				alert("更新失败，请稍后重试");
+				reload("detail");
+			}
+		});
+	}
+
+	return false;
+}
+
+function transferWorkDate(work_year) {
+	var timeToday = (new Date()).getTime();
+	var timeWork = timeToday-work_year*86400000*365;
+	var date = new Date(timeWork);
+
+	return date.format("yyyy-MM-dd 00:00:00");
+}
+
+function reload(tab) {
+	var url = location.pathname+"?id="+masterid+"&seltab="+tab+"&t="+(new Date()).getTime();
+	location.href= url;
+}
+
+</script>
+
+</head>
+<body>
+	<div class="main-head detail container-fluid">
+		<h3>后台管理系统-老师详情</h3>
+		<div class="tabs">
+			<div id="tab-update" class="tab selected">编辑信息</div>
+			<div id="tab-service" class="tab">编辑服务</div>
+		</div>
+	</div>
+	<div class="container-fluid">
+		<div class="iframe-detail">
+			<iframe id="framedetail" src=""></iframe>
+		</div>
+		<div id="form-update">
+			<form id="master" onsubmit="return checkform(this)">
+				<div class="form-line clearfix">
+					<div class="form-title">昵称</div>
+					<div class="form-desc"></div>
+					<div class="form-input"><input type="text" name="nick_name"/></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">性别</div>
+					<div class="form-desc">男填写M，女填写F</div>
+					<div class="form-input"><input type="text" name="sex"/></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">手机号</div>
+					<div class="form-desc">请填写11位数字</div>
+					<div class="form-input"><input type="text" name="contact_mobile"/></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">qq</div>
+					<div class="form-desc"></div>
+					<div class="form-input"><input type="text" name="contact_qq"/></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">微信</div>
+					<div class="form-desc"></div>
+					<div class="form-input"><input type="text" name="contact_weixin"/></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">所在地</div>
+					<div class="form-desc">例：浙江省 杭州市</div>
+					<div class="form-input"><input type="text" name="live_address"/></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">从业年限</div>
+					<div class="form-desc">请填写数字，例：4.3</div>
+					<div class="form-input"><input type="text" name="work_year"/></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">所学门派</div>
+					<div class="form-desc"></div>
+					<div class="form-input"><textarea name="school" row="5"></textarea></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">相关经历</div>
+					<div class="form-desc"></div>
+					<div class="form-input"><textarea name="experience" row="5"></textarea></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">所获成就</div>
+					<div class="form-desc"></div>
+					<div class="form-input"><textarea name="achievement" row="5"></textarea></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">擅长领域</div>
+					<div class="form-desc"></div>
+					<div class="form-input"><textarea name="good_at" row="5"></textarea></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">职业</div>
+					<div class="form-desc"></div>
+					<div class="form-input"><input type="text" name="profession"/></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">是否全职</div>
+					<div class="form-desc">全职填Y，非全职填N</div>
+					<div class="form-input"><input type="text" name="is_full_time"/></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title">是否签约其他平台</div>
+					<div class="form-desc">有签约填Y，无签约填N</div>
+					<div class="form-input"><input type="text" name="is_sign_other"/></div>
+				</div>
+				<div class="form-line clearfix">
+					<div class="form-title"></div>
+					<div class="form-input"><input type="submit" class="btn btn-primary" value="确认更新"></div>
+				</div>
+			</form>
+		</div>
+
+		<div id="form-service" style="display:none;">
+			<table class="table table-hover">
+				<tbody id="servicelist">
+					<tr>
+						<th style="width:25%">服务项目</th>
+						<th style="width:15%">价格</th>
+						<th style="width:15%">服务状态</th>
+						<th style="width:10%">平台推荐</th>
+						<th style="width:35%">操作</th>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+
+	<div class="modal fade" tabindex="-1" role="dialog" id="modalServiceUpdate">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title">变更服务</h4>
+				</div>
+				<div class="modal-body">
+					<input id="cateid" style="display:none;"/>
+					<input id="modal-type" style="display:none;"/>
+					<div class="form-line">
+						<div class="form-title">请输入服务价格</div>
+						<div class="form-input"><input name="amt" id="service-amt"/></div>
+					</div>
+					<div class="form-line">
+						<div class="form-title">服务状态</div>
+						<div class="form-input input-group dropdown">
+							<button class="btn btn-default dropdown-toggle"  id="status-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="ON">服务中</span><span class="caret"></span>
+							</button>
+							<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+								<li><a data-value="ON">服务中</a></li>
+								<li><a data-value="Off">暂停服务</a></li>
+							</ul>
+						</div>
+					</div>
+					<div class="form-line">
+						<div class="form-title">是否推荐</div>
+						<div class="form-input input-group dropdown">
+							<button class="btn btn-default dropdown-toggle"  id="recomm-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="N">暂不推荐</span><span class="caret"></span>
+							</button>
+							<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+								<li><a data-value="N">暂不推荐</a></li>
+								<li><a data-value="Y">推荐</a></li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+					<button type="button" class="btn btn-primary" id="btnService">确认添加</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雷门易后台-账单详情</title>
+<link href="css/bootstrap.min.css" rel="stylesheet">
+
+<link href="css/styles.css" rel="stylesheet">
+<style type="text/css">
+.breadcrumb {margin: 20px 0;}
+</style>
+
+<script src="js/jquery-1.11.3.min.js"></script>
+<script src="js/bootstrap.js"></script>
+<script src="js/common.js"></script>
+<script src="js/fsapi.js"></script>
+<script type="text/javascript">
+var date = "";
+$(document).ready(function(){
+	date = commonUtils.getUrlParamURI("date");
+	fsApi.billDetail({date: date}, function(data){
+		updateList(data);
+	});
+})
+
+function updateList(data) {
+	$("#userlist .user").remove();
+	var domList = $("#userlist");
+	var users = data.list;
+
+	for (var i = 0; i < users.length; i++) {
+		var user = users[i];
+		var domLine = $('<tr class="user"></tr>');
+		domLine.append('<td>'+user.seller_name+'</td>');
+		domLine.append('<td>'+user.seller_nick_name+'</td>');
+		domLine.append('<td>'+user.num+'</td>');
+		domLine.append('<td>'+commonUtils.numberCurrencyFix(user.pay_sum/100)+'元</td>');
+		domLine.append('<td>'+commonUtils.numberCurrencyFix(user.plat_sum/100)+'元</td>');
+		domLine.append('<td>'+commonUtils.numberCurrencyFix(user.master_sum/100)+'元</td>');
+		domList.append(domLine);
+	};
+}
+
+
+</script>
+
+</head>
+<body>
+	<div class="main-head detail container-fluid">
+		<h3>后台管理系统-招募详情</h3>
+	</div>
+
+	<div class="container-fluid">
+		<div class="main-view-detail">
+		<div class="table-bill-detail">
+			<table class="table table-hover">
+				<tbody id="userlist">
+					<tr>
+						<th>老师姓名</th>
+						<th>老师昵称</th>
+						<th>订单数</th>
+						<th>订单总额</th>
+						<th>平台佣金总额</th>
+						<th>老师结算总额</th>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		</div>
+
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雷门易后台管理系统</title>
+<link href="css/bootstrap.min.css" rel="stylesheet">
+<link href="css/styles.css" rel="stylesheet">
+<script src="js/jquery-1.11.3.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
+<script src="js/fsapi.js?v=201708191301"></script>
+<script type="text/javascript">
+$(document).ready(function(){
+	initAdmin();
+})
+
+function init() {
+	var href = location.href;
+	var curpage = "menuorders";
+	var idx = href.indexOf("#");
+	if (idx > -1) {
+		var tmp = href.substr(idx+1);
+		if (tmp.indexOf("orders") == 0) {
+			curpage = "menuorders";
+		} else if (tmp.indexOf("masters") == 0) {
+			curpage = "menumasters";
+		} else if (tmp.indexOf("recruits") == 0) {
+			curpage = "menurecruits";
+		} else if (tmp.indexOf("bills") == 0) {
+			curpage = "menubills";
+		}
+	};
+	updateMenu(curpage);
+}
+
+function initAdmin() {
+	fsApi.getAdmin(function(data) {
+		if (data.code == "00") {
+			$("#admin").html(data.admin.username);
+			init();
+		};
+	});
+}
+
+function logoutAdmin() {
+	fsApi.logoutAdmin(function(data) {
+		if (data.code == "00") {
+			location.href = fsApi.loginUrl;
+		};
+	});
+}
+
+function updateMenu(curpage) {
+	var domActive = $(".main-menu li.active");
+	if (domActive.attr("id") == curpage) {
+		return;
+	};
+	$(".main-menu li.active").removeClass("active");
+	$("#"+curpage).addClass("active");
+	var urls = {
+		"menuorders": "orders.html",
+		"menumasters": "masters.html",
+		"menurecruits": "recruits.html"
+		// "menubills": "bills.html",
+	}
+	$("#iframeview").attr("src", urls[curpage]+"?t="+(new Date()).getTime());
+}
+
+
+</script>
+
+</head>
+<body>
+	<div class="main-head container-fluid">
+		<div class="main-admin">
+			<span id="admin"></span>
+			<a href="javascript:logoutAdmin();">登出</a>
+		</div>
+		<h3>后台管理系统</h3>
+	</div>
+	<div class="main-menu">
+		<ul class="nav nav-pills nav-stacked">
+			<li role="presentation" id="menuorders"><a href="#orders" onclick="updateMenu('menuorders')">订单管理</a></li>
+			<li role="presentation" id="menumasters"><a href="#masters" onclick="updateMenu('menumasters')">老师管理</a></li>
+			<li role="presentation" id="menurecruits"><a href="#recruits" onclick="updateMenu('menurecruits')">招募管理</a></li>
+			<!-- <li role="presentation" id="menubills"><a href="#bills" onclick="updateMenu('menubills')">账单管理</a></li> -->
+		</ul>
+	</div>
+	<div class="main-view">
+		<iframe id="iframeview" src=""></iframe>
+	</div>
+</body>
+</html>

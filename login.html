@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雷门易后台管理登录</title>
+<link href="css/bootstrap.min.css" rel="stylesheet">
+
+<link href="css/styles.css" rel="stylesheet">
+<style type="text/css">
+body {background-color: #eee;}
+.dlg-login {width: 400px; margin: 200px auto 100px; background-color: #fff; border: 1px solid #333; border-radius: 8px; padding: 15px 30px; box-sizing: border-box;}
+.dlg-login .form-horizontal {margin-top: 30px;}
+#btnLogin {width: 80px;}
+.error {color: #f55; font-size: 12px; }
+</style>
+
+<script src="js/jquery-1.11.3.min.js"></script>
+<script src="js/bootstrap.js"></script>
+<script src="js/common.js"></script>
+<script src="js/fsapi.js"></script>
+<script src="js/jquery.md5.js"></script>
+<script type="text/javascript">
+$(document).ready(function(){
+})
+
+function login() {
+	var username = $("#username").val();
+	var password = $("#password").val();
+	fsApi.loginAdmin({
+		username: username,
+		password: $.md5(password)
+	}, function(data) {
+		if (data.code == "88") {
+			$(".error").html("账户名或密码错误，请重新输入");
+		} else {
+			$(".error").html("");
+			var backUrl = commonUtils.getUrlParamURI("back_url");
+			if (backUrl && backUrl.length>0) {
+				location.href= backUrl;
+			} else {
+				location.href = "index.html";
+			}
+		}
+	});
+	return false;
+}
+</script>
+
+</head>
+<body>
+	<div class="container-fluid">
+		<div class="dlg-login">
+			<h4>登录雷门易后台管理</h4>
+			<form class="form-horizontal" onsubmit="return login();">
+				<div class="form-group clearfix">
+					<label class="col-md-3 control-label" for="username">账号名：</label>
+					<div class="col-md-9">
+						<input type="text" class="form-control" id="username" name="username">
+					</div>
+				</div>
+				<div class="form-group clearfix">
+					<label class="col-md-3 control-label" for="password">密码：</label>
+					<div class="col-md-9">
+						<input type="password" class="form-control" id="password" name="password">
+					</div>
+				</div>
+				
+				<div class="form-group clearfix">
+					<div class="col-md-3"></div>
+					<div class="col-md-9 error"></div>
+				</div>
+
+				<div class="form-group clearfix">
+					<div class="col-md-3"></div>
+					<div class="col-md-9">
+						<button class="btn btn-primary" id="btnLogin">登录</button>
+					</div>
+				</div>
+			</form>
+		</div>
+	</div>
+</body>
+</html>

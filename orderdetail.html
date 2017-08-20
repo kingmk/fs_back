@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雷门易后台-订单详情</title>
+<link href="css/bootstrap.min.css" rel="stylesheet">
+
+<link href="css/styles.css?v=201708131301" rel="stylesheet">
+<style type="text/css">
+.baseinfo {float:right; text-align: right; font-size: 12px;}
+.baseinfo .status {background-color: #fff; padding: 5px 15px; display: inline-block; border-radius: 3px; font-weight: bold;}
+.baseinfo .status.pay_succ {background-color: #9f9; }
+.baseinfo .status.init,.baseinfo .status.pay_fail {background-color: #ccc;}
+.baseinfo .status.refund_applied,.baseinfo .status.refunded {background-color: #f33; color: #fff;}
+.baseinfo .status.completed,.baseinfo .status.settlement {background-color: #33f; color: #fff;}
+
+.refund_reason {padding: 10px; border: 1px solid #ddd; box-sizing: border-box; background-color: #f33; border-radius: 5px; word-break: break-all; color: #fff; margin-bottom: 15px;}
+.evaluate {padding: 10px; border: 1px solid #ddd; box-sizing: border-box; background-color: #fff; border-radius: 5px; word-break: break-all; margin-bottom: 15px;}
+.evaluate .op {float: right; width: 100px; padding-left: 10px;}
+.evaluate .op .btn {width: 80px; padding: 0; height: 28px; line-height: 28px; margin-bottom: 5px;}
+.extroinfo {padding: 10px; border: 1px solid #ddd; box-sizing: border-box; background-color: #fff; border-radius: 5px; word-break: break-all;}
+.chat {margin: 10px 0;}
+.chat .user {width: 80px; text-align: center; padding: 10px; box-sizing: border-box; border-radius: 5px; line-height: 24px;}
+.chat.buyer .user {float: left; background-color: #ccf;}
+.chat.seller .user {float: right; background-color: #cfc;}
+.chat .content .info { padding: 10px; background-color: #fff; border-radius: 5px; line-height: 24px;}
+.chat.buyer .content {margin-left: 90px; }
+.chat.seller .content {margin-right: 90px;}
+.chat.buyer .content .info {float: left; }
+.chat.seller .content .info {float: right;}
+.chat .content img {max-height: 80px;}
+.chat .content .time {width: 100%; margin: 5px 10px; font-size: 10px; color: #999; box-sizing: border-box;}
+.chat.buyer .content .time {float:left; text-align: left;}
+.chat.seller .content .time {float:right; text-align: right;}
+
+.foot-opbar{ width: 70%; height: 50px; position: fixed; bottom: 0; left: 15%; right:15%; background-color: #e0e0e0; line-height: 50px; box-sizing:border-box;}
+#baropr {text-align: right;}
+#barinfo {text-align: left; padding-left: 30px;}
+textarea {width: 100%; border:1px solid #ccc; border-radius: 4px;}
+</style>
+
+<script src="js/jquery-1.11.3.min.js"></script>
+<script src="js/bootstrap.js"></script>
+<script src="js/common.js"></script>
+<script src="js/fsapi.js?v=201708131402"></script>
+<script type="text/javascript">
+var orderId = -1;
+var order = null;
+var evaluate = null;
+var statusStr = {"effect":"生效","del":"作废"};
+$(document).ready(function(){
+	orderId = commonUtils.getUrlParamURI("id");
+	fsApi.orderDetail({id:orderId}, function(data){
+		console.log(data);
+		order = data.order;
+		order.buyer = data.buy_usr;
+		order.seller = data.seller_usr;
+		initBaseInfo(data.order);
+		evaluate = data.evaluate;
+		showEvaluate(evaluate);
+		showChats(data.chats, order);
+	})
+})
+
+function initBaseInfo(order){
+	var domInfo = $(".baseinfo");
+	domInfo.find("#buyer").html(order.buyer.real_name);
+	domInfo.find("#seller").html(order.seller.real_name);
+	domInfo.find("#goods_name").html(order.goods_name);
+	domInfo.find("#price").html("￥"+commonUtils.numberCurrencyFix(order.pay_rmb_amt/100))
+	domInfo.find("#status").addClass(order.status).html(order_status_map[order.status]);
+	domInfo.show();
+	showExtraInfo(order.goods_name, JSON.parse(order.order_extra_info));
+
+	if (order.status == "refund_applied") {
+		showRefundOp(order);
+	} else if (order.status == "refunded" || order.status== "refund_fail" || order.status == "refunding") {
+		showRefundRlt(order);
+	}
+}
+
+function showRefundOp(order) {
+	$(".refund_reason").show();
+	$(".refund_reason").text("用户退款理由："+order.refund_reason);
+	$("#baropr").show();
+	$("#btnApprove").click(function() {
+		var params = {
+			id: orderId,
+			isAgree: "Y",
+			reason: $("#approveReason").val()
+		};
+
+		fsApi.auditRefund(params, function(data){
+			if (data.code == "00") {
+				alert("已退款");
+				location.reload();
+			} else {
+				alert(data.msg);
+			}
+		});
+	});
+
+	$("#btnRefuse").click(function() {
+		var params = {
+			id: orderId,
+			isAgree: "N",
+			reason: $("#refuseReason").val()
+		};
+
+		fsApi.auditRefund(params, function(data){
+			if (data.code == "00") {
+				alert("已拒绝退款");
+				location.reload();
+			} else {
+				alert(data.msg);
+			}
+		});
+	});
+}
+
+function showRefundRlt(order) {
+	$(".refund_reason").show();
+	$(".refund_reason").text("用户退款理由："+order.refund_reason);
+	$("#barinfo").show();
+	$("#barinfo").text("已于"+order.refund_audit_time+"处理该退款请求，处理理由："+order.refund_audit_word);
+}
+
+function showEvaluate(evaluate) {
+	if (!evaluate) {
+		return;
+	};
+
+	var domEva = $(".evaluate");
+	evaluate.resp_speed = parseInt(evaluate.resp_speed);
+	evaluate.major_level = parseInt(evaluate.major_level);
+	evaluate.service_attitude = parseInt(evaluate.service_attitude);
+	evaluate.avg = (evaluate.resp_speed+evaluate.major_level+evaluate.service_attitude)/3;
+	domEva.append($('<div>客户已于'+evaluate.create_time+'完成评论</div>'));
+	if (evaluate.status != "effect") {
+		domEva.append($('<div style="color:red">该评价已被作废</div>'));
+	};
+	domEva.append($('<div>综合评分：'+commonUtils.numberCurrencyFix(evaluate.avg)+'；响应速度：'+commonUtils.numberCurrencyFix(evaluate.resp_speed)+'；专业水平：'+commonUtils.numberCurrencyFix(evaluate.major_level)+'；服务态度：'+commonUtils.numberCurrencyFix(evaluate.service_attitude)+'</div>'));
+	domEva.append($('<div>评价内容：'+evaluate.evaluate_word+'</div>'));
+
+	var domOp = $('<div class="op"></div>');
+	var domBtnUpdate = $('<button class="btn btn-primary" data-toggle="modal" data-target="#modalEvaluate" data-evaid="'+evaluate.id+'">修改</button>');
+	var domBtnDelete = $('<button class="btn btn-warning" data-toggle="modal" data-target="#modalEvaluateDel" data-evaid="'+evaluate.id+'">删除</button>');
+	domOp.append(domBtnUpdate);
+	domOp.append(domBtnDelete);
+	initEvaluateModal();
+
+
+
+	domEva.prepend(domOp);
+
+	domEva.show();
+
+}
+
+function initEvaluateModal() {
+	// $("#status-sel").dropdown().on("changeSelect", function(e) {
+	// });
+	$("#resp-sel").dropdown().on("changeSelect", function(e) {
+	});
+	$("#major-sel").dropdown().on("changeSelect", function(e) {
+	});
+	$("#attitude-sel").dropdown().on("changeSelect", function(e) {
+	});
+	$("#modalEvaluate").on("show.bs.modal", function(event) {
+		var dom = $(event.relatedTarget);
+		var domModal = $(this);
+
+		domModal.find("#evaid").val(evaluate.id);
+
+		domModal.find("#evaluate_word").val(evaluate.evaluate_word);
+
+		// var domStatus = domModal.find("#status-sel .value");
+		// domStatus.attr("data-value", evaluate.status);
+		// domStatus.text(statusStr[evaluate.status]);
+
+		var domResp = domModal.find("#resp-sel .value");
+		domResp.attr("data-value", evaluate.resp_speed);
+		domResp.text(evaluate.resp_speed);
+
+		var domMajor = domModal.find("#major-sel .value");
+		domMajor.attr("data-value", evaluate.major_level);
+		domMajor.text(evaluate.major_level);
+
+		var domAttitude = domModal.find("#attitude-sel .value");
+		domAttitude.attr("data-value", evaluate.service_attitude);
+		domAttitude.text(evaluate.service_attitude);
+	});
+
+	$("#btnEvaUpdate").click(function(){
+		var domModal = $("#modalEvaluate");
+		// var status = domModal.find("#status-sel .value").attr("data-value");
+		var status = "effect";
+		var resp_speed = domModal.find("#resp-sel .value").attr("data-value");
+		var major_level = domModal.find("#major-sel .value").attr("data-value");
+		var service_attitude = domModal.find("#attitude-sel .value").attr("data-value");
+		var evaluate_word = domModal.find("#evaluate_word").val();
+
+		var params = {
+			id: evaluate.id,
+			status: status,
+			resp_speed: resp_speed,
+			major_level: major_level,
+			service_attitude: service_attitude,
+			evaluate_word: evaluate_word
+		}
+		console.log(params);
+
+		fsApi.updateOrderEvaluate(params, function(data){
+			if (data.code == "00") {
+				alert("修改成功");
+				location.reload();
+			} else {
+				alert("修改失败，请稍后重试");
+			}
+		})
+	})
+
+	$("#btnEvaDel").click(function(){
+		fsApi.deleteOrderEvaluate({id:evaluate.id}, function(data){
+			if (data.code == "00") {
+				alert("修改成功");
+				location.reload();
+			} else {
+				alert("修改失败，请稍后重试");
+			}
+		})
+	})
+}
+
+
+function showChats(chats, order) {
+	var domChats = $(".chats");
+	for (var i = 0; i < chats.length; i++) {
+		var chat = chats[i];
+		var domChat = $('<div class="chat clearfix"></div>');
+		var role = "";
+		var username = "";
+		if (chat.sent_usr_id == order.buyer.id) {
+			domChat.addClass("buyer");
+			role = "用户";
+			username = (order.buyer.real_name?order.buyer.real_name:"匿名客户")+"<br/>(用户)";
+		} else {
+			domChat.addClass("seller");
+			role = "老师";
+			username = order.seller.real_name+"<br/>(老师)";
+			if (order.seller.nick_name) {
+				username += "<br/>("+order.seller.nick_name+")";
+			};
+		}
+		domChat.append($('<div class="user">'+username+'</div>'));
+		var domContent = $('<div class="content clearfix"></div>');
+		if (chat.msg_type == "text") {
+			domContent.append($('<div class="info">'+chat.content+'</div>'));
+		} else if (chat.msg_type == "img") {
+			domContent.append($('<div class="info"><img src="'+chat.content+'"></div>'));
+		}
+		var date = new Date(chat.create_time);
+		domContent.append($('<div class="time">'+date.format("MM-dd hh:mm")+'</div>'));
+		domChat.append(domContent);
+		domChats.append(domChat);
+	};
+}
+
+function showExtraInfo(goods_name, extroinfo) {
+	if (!extroinfo) {
+		$(".extroinfo").text("用户尚未提交信息");
+		return;
+	};
+	var formStruct = mapExtraInfo(goods_name);
+	var domInfo = $('<div class="extroinfo_detail"></div>');
+	for (var i = 0; i < formStruct.length; i++) {
+		var formSet = formStruct[i];
+		var domSet = $('<div class="extroinfo_set"></div>');
+		domSet.append($('<div class="extroinfo-title">'+formSet.title+'</div>'));
+		if (extroinfo[formSet.index]) {
+			var strs = [];
+			for (var j = 0; j < formSet.data.length; j++) {
+				var formField = formSet.data[j];
+				strs.push(formField.title+": "+extroinfo[formSet.index][formField.fieldname]||"无");
+			};
+			domSet.append($('<div class="extroinfo-data">'+strs.join("; ")+'</div>'));
+		} else {
+			domSet.append($('<div class="extroinfo-data">未填写</div>'));
+		}
+
+		domInfo.append(domSet);
+	};
+	$(".extroinfo").append(domInfo);
+}
+
+function mapExtraInfo(goods_name) {
+	var formData = [];
+	switch(goods_name) {
+		case "流年运势":
+		case "婚恋感情":
+		case "健康事业财运":
+		case "八字详批":
+		case "命运祥批":
+		{
+			formData = [{
+				title: "咨询人信息",
+				index: 0,
+				data: [
+					{title: "中文姓名", fieldname: "realName"},
+					{title: "英文姓名", fieldname: "englishName"},
+					{title: "性别", fieldname: "sex"},
+					{title: "公历出生日期", fieldname: "birthDate"},
+					{title: "出生时刻", fieldname: "birthTimeText"},
+					{title: "出生地", fieldname: "birthAddress"},
+					{title: "婚姻状况", fieldname: "marriageStatus"},
+					{title: "家中排行", fieldname: "familyRank"}
+				]
+			}];
+			break;
+		}
+		case "个人改名":
+		{
+			formData = [{
+				title: "改名人信息",
+				index: 0,
+				data: [
+					{title: "中文姓名", fieldname: "realName"},
+					{title: "曾用名", fieldname: "onceName"},
+					{title: "性别", fieldname: "sex"},
+					{title: "公历出生日期", fieldname: "birthDate"},
+					{title: "出生时刻", fieldname: "birthTimeText"},
+					{title: "出生地", fieldname: "birthAddress"},
+					{title: "婚姻状况", fieldname: "marriageStatus"},
+					{title: "家中排行", fieldname: "familyRank"}
+				]
+			}]
+			break;
+		}
+		case "个人起名":
+		{
+			formData = [{
+				title: "起名人信息",
+				index: 0,
+				data: [
+					{title: "性别", fieldname: "sex"},
+					{title: "公历出生日期", fieldname: "birthDate"},
+					{title: "出生时刻", fieldname: "birthTimeText"},
+					{title: "出生地", fieldname: "birthAddress"},
+					{title: "家中排行", fieldname: "familyRank"},
+					{title: "哥哥姓名", fieldname: "brotherName"},
+					{title: "姐姐姓名", fieldname: "sisterName"}
+				]
+			}];
+			break;
+		}
+		case "公司起名":
+		{
+			formData = [{
+				title: "企业信息",
+				index: 0,
+				data: [
+					{title: "成立时间", fieldname: "establishedDate"},
+					{title: "所处行业", fieldname: "industry"},
+					{title: "主营业务", fieldname: "scopeOfBusiness"},
+					{title: "所在地", fieldname: "comAddress"},
+					{title: "现用名", fieldname: "curComName"}
+				]
+			}, {
+				title: "企业主信息",
+				index: 0,
+				data: [
+					{title: "姓名", fieldname: "realName"},
+					{title: "性别", fieldname: "sex"},
+					{title: "公历出生日期", fieldname: "birthDate"},
+					{title: "出生时刻", fieldname: "birthTimeText"},
+					{title: "出生地", fieldname: "birthAddress"}
+				]
+			}];
+			break;
+		}
+		case "结婚吉日":
+		{
+			formData = [{
+				title: "未婚夫",
+				index: 0,
+				data: [
+					{title: "中文姓名", fieldname: "realName"},
+					{title: "英文姓名", fieldname: "englishName"},
+					{title: "性别", fieldname: "sex"},
+					{title: "公历出生日期", fieldname: "birthDate"},
+					{title: "出生时刻", fieldname: "birthTimeText"},
+					{title: "出生地", fieldname: "birthAddress"}
+				]
+			}, {
+				title: "未婚妻",
+				index: 1,
+				data: [
+					{title: "中文姓名", fieldname: "realName"},
+					{title: "英文姓名", fieldname: "englishName"},
+					{title: "性别", fieldname: "sex"},
+					{title: "公历出生日期", fieldname: "birthDate"},
+					{title: "出生时刻", fieldname: "birthTimeText"},
+					{title: "出生地", fieldname: "birthAddress"}
+				]
+			}, {
+				title: "期望结婚日期",
+				index: 0,
+				data: [
+					{title: "期望开始日期", fieldname: "expectMarriageDateBegin"},
+					{title: "期望结束日期", fieldname: "expectMarriageDateEnd"},
+				]
+			}];
+			break;
+		}
+		case "择日生子":
+		{
+			formData = [{
+				title: "父亲信息",
+				index: 0,
+				data: [
+					{title: "中文姓名", fieldname: "realName"},
+					{title: "英文姓名", fieldname: "englishName"},
+					{title: "性别", fieldname: "sex"},
+					{title: "公历出生日期", fieldname: "birthDate"},
+					{title: "出生时刻", fieldname: "birthTimeText"},
+					{title: "出生地", fieldname: "birthAddress"}
+				]
+			}, {
+				title: "母亲信息",
+				index: 1,
+				data: [
+					{title: "中文姓名", fieldname: "realName"},
+					{title: "英文姓名", fieldname: "englishName"},
+					{title: "性别", fieldname: "sex"},
+					{title: "公历出生日期", fieldname: "birthDate"},
+					{title: "出生时刻", fieldname: "birthTimeText"},
+					{title: "出生地", fieldname: "birthAddress"}
+				]
+			}, {
+				title: "子女信息",
+				index: 0,
+				data: [
+					{title: "第几胎", fieldname: "fetusNum"}
+				]
+			}];
+			break;
+		}
+		case "开张开市":
+		{
+			formData = [{
+				title: "企业信息",
+				index: 0,
+				data: [
+					{title: "现用名", fieldname: "curComName"},
+					{title: "所处行业", fieldname: "industry"},
+					{title: "主营业务", fieldname: "scopeOfBusiness"},
+					{title: "所在地", fieldname: "comAddress"}
+				]
+			}, {
+				title: "企业主信息",
+				index: 0,
+				data: [
+					{title: "姓名", fieldname: "realName"},
+					{title: "性别", fieldname: "sex"},
+					{title: "公历出生日期", fieldname: "birthDate"},
+					{title: "出生时刻", fieldname: "birthTimeText"},
+					{title: "出生地", fieldname: "birthAddress"}
+				]
+			}];
+			break;
+		}
+		case "乔迁择日": 
+		{
+			formData = [{
+				title: "新宅信息",
+				index: 0,
+				data: [
+					{title: "新宅地址", fieldname: "newAddress"},
+					{title: "新宅落成时间", fieldname: "completedTime"},
+					{title: "期望乔迁开始时间", fieldname: "expectMoveDateBegin"},
+					{title: "期望乔迁结束时间", fieldname: "expectMoveDateEnd"}
+				]
+			},{
+				title: "主人信息",
+				index: 0,
+				data: [
+					{title: "中文姓名", fieldname: "realName"},
+					{title: "英文姓名", fieldname: "englishName"},
+					{title: "性别", fieldname: "sex"},
+					{title: "公历出生日期", fieldname: "birthDate"},
+					{title: "出生时刻", fieldname: "birthTimeText"},
+					{title: "出生地", fieldname: "birthAddress"}
+				]
+			}, {
+				title: "伴侣信息",
+				index: 1,
+				data: [
+					{title: "中文姓名", fieldname: "realName"},
+					{title: "英文姓名", fieldname: "englishName"},
+					{title: "性别", fieldname: "sex"},
+					{title: "公历出生日期", fieldname: "birthDate"},
+					{title: "出生时刻", fieldname: "birthTimeText"},
+					{title: "出生地", fieldname: "birthAddress"}
+				]
+			}];
+			break;
+		}
+	}
+	return formData;
+}
+
+</script>
+
+</head>
+<body>
+	<div class="main-head detail container-fluid">
+		<div class="baseinfo" style="display:none;">
+			<div><span id="buyer"></span>&nbsp;向&nbsp;<span id="seller"></span>&nbsp;咨询&nbsp;<span id="goods_name"></span></div>
+			<div><span id="price"></span></div>
+			<div><span id="status" class="status"></span></div>
+		</div>
+		<h3>后台管理系统-订单详情</h3>
+	</div>
+	<div class="container-fluid">
+		<div class="main-view-detail">
+			<div class="refund_reason" style="display:none;"></div>
+			<div class="evaluate" style="display:none;"></div>
+			<div class="extroinfo"></div>
+			<div class="chats">
+			</div>
+		</div>
+		<div class="foot-opbar">
+			<div id="baropr" style="display:none;">
+				<button class="btn btn-primary" data-toggle="modal" data-target="#modalApprove">同意退款</button>
+				<button class="btn btn-danger" data-toggle="modal" data-target="#modalReject">拒绝退款</button>
+			</div>
+			<div id="barinfo" style="display:none;"></div>
+		</div>
+	</div>
+
+	<div class="modal fade" tabindex="-1" role="dialog" id="modalApprove">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title">同意退款确认</h4>
+				</div>
+				<div class="modal-body">
+					<h5>请输入同意退款理由</h5>
+					<textarea rows="3" id="approveReason"></textarea>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">再考虑一下</button>
+					<button type="button" class="btn btn-primary" id="btnApprove">确认通过</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="modal fade" tabindex="-1" role="dialog" id="modalReject">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title">拒绝退款确认</h4>
+				</div>
+				<div class="modal-body">
+					<h5>请输入拒绝退款理由</h5>
+					<textarea rows="3" id="refuseReason"></textarea>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">再考虑一下</button>
+					<button type="button" class="btn btn-primary" id="btnRefuse">确认拒绝</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+
+	<div class="modal fade" tabindex="-1" role="dialog" id="modalEvaluate">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title">修改评价</h4>
+				</div>
+				<div class="modal-body">
+					<input id="evaid" style="display:none;"/>
+					<!-- <div class="form-line">
+						<div class="form-title">评价状态</div>
+						<div class="form-input input-group dropdown">
+							<button class="btn btn-default dropdown-toggle"  id="status-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="effect">生效</span><span class="caret"></span>
+							</button>
+							<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+								<li><a data-value="effect">生效</a></li>
+								<li><a data-value="del">作废</a></li>
+							</ul>
+						</div>
+					</div> -->
+					<div class="form-line">
+						<div class="form-title">响应速度</div>
+						<div class="form-input input-group dropdown">
+							<button class="btn btn-default dropdown-toggle"  id="resp-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="5">5</span><span class="caret"></span>
+							</button>
+							<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+								<li><a data-value="1">1</a></li>
+								<li><a data-value="2">2</a></li>
+								<li><a data-value="3">3</a></li>
+								<li><a data-value="4">4</a></li>
+								<li><a data-value="5">5</a></li>
+							</ul>
+						</div>
+					</div>
+					<div class="form-line">
+						<div class="form-title">专业水平</div>
+						<div class="form-input input-group dropdown">
+							<button class="btn btn-default dropdown-toggle"  id="major-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="5">5</span><span class="caret"></span>
+							</button>
+							<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+								<li><a data-value="1">1</a></li>
+								<li><a data-value="2">2</a></li>
+								<li><a data-value="3">3</a></li>
+								<li><a data-value="4">4</a></li>
+								<li><a data-value="5">5</a></li>
+							</ul>
+						</div>
+					</div>
+					<div class="form-line">
+						<div class="form-title">服务态度</div>
+						<div class="form-input input-group dropdown">
+							<button class="btn btn-default dropdown-toggle"  id="attitude-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="5">5</span><span class="caret"></span>
+							</button>
+							<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+								<li><a data-value="1">1</a></li>
+								<li><a data-value="2">2</a></li>
+								<li><a data-value="3">3</a></li>
+								<li><a data-value="4">4</a></li>
+								<li><a data-value="5">5</a></li>
+							</ul>
+						</div>
+					</div>
+					<div class="form-line">
+						<div class="form-title">评价内容</div>
+						<div class="form-input">
+							<textarea rows="3" id="evaluate_word"></textarea>
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+					<button type="button" class="btn btn-primary" id="btnEvaUpdate">确认修改</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+
+	<div class="modal fade" tabindex="-1" role="dialog" id="modalEvaluateDel">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title">删除评价</h4>
+				</div>
+				<div class="modal-body">
+					<h5>确认删除该评价么？一旦删除则无法恢复！</h5>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">再考虑一下</button>
+					<button type="button" class="btn btn-primary" id="btnEvaDel">确认删除</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

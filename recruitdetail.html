@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雷门易后台-招募详情</title>
+<link href="css/bootstrap.min.css" rel="stylesheet">
+
+<link href="css/styles.css" rel="stylesheet">
+<style type="text/css">
+.breadcrumb {margin: 20px 0;}
+.row {padding: 10px 0; border-bottom: 1px solid #fafafa;}
+.foot-opbar{ width: 70%; height: initial; min-height: 50px; position: fixed; bottom: 0; left: 15%; right:15%; background-color: #e0e0e0; line-height: 30px; box-sizing:border-box; padding-top: 10px;}
+#baropr {text-align: right;}
+#barinfo {text-align: left; padding-left: 30px;}
+.foot-opbar .btn {margin-right: 30px;}
+.col-md-9 {word-break: break-all;}
+textarea {width: 100%; border:1px solid #ccc; border-radius: 4px;}
+
+#cert_img img {width: 300px;}
+</style>
+
+<script src="js/jquery-1.11.3.min.js"></script>
+<script src="js/bootstrap.js"></script>
+<script src="js/common.js"></script>
+<script src="js/fsapi.js"></script>
+<script type="text/javascript">
+var id = -1;
+$(document).ready(function(){
+	id = commonUtils.getUrlParamURI("id");
+	fsApi.recruitDetail({id: id}, function(data){
+		initDetail(data.recruit);
+	});
+})
+
+function initDetail(detail) {
+	var sexstr = "unknown";
+	if (detail.sex && detail.sex == "M") {
+		sexstr = "男";
+	} else if (detail.sex && detail.sex == "F") {
+		sexstr = "女";
+	}
+	detail.sexstr = sexstr;
+	var curyear = (new Date()).getFullYear();
+	detail.age = curyear - detail.birth_year;
+	var imgstr = '<a href="'+detail.cert_img1_url+'" target="_blank"><img src="'+detail.cert_img1_url+'"/></a><br/><a href="'+detail.cert_img2_url+'" target="_blank"><img src="'+detail.cert_img2_url+'"/></a>';
+	detail.cert_img = imgstr;
+	detail.sign_other = (detail.is_sign_other=="Y"?"是":"否");
+	var doms = $(".main-view-detail .col-md-9");
+	for (var i = 0; i < doms.length; i++) {
+		var dom = $(doms[i]);
+		var domId = dom.attr("id");
+		dom.html(detail[domId]);
+	};
+	if (detail.audit_status == "ing") {
+		$("#baropr").show();
+	} else {
+		var info = {
+			"approved": "审核通过",
+			"refuse": "审核拒绝"
+		}
+		$("#barinfo").html("已于"+detail.audit_time+info[detail.audit_status]+"，理由："+detail.audit_word);
+		$("#barinfo").show();
+	}
+
+	$("#btnApprove").click(function() {
+		var params = {
+			id: id,
+			status: "approved",
+			reason: $("#approveReason").val()
+		};
+
+		fsApi.auditRecruit(params, function(data){
+			if (data.code == "00") {
+				alert("已审核通过");
+				location.reload();
+			} else {
+				alert(data.msg);
+			}
+		});
+	});
+
+	$("#btnRefuse").click(function() {
+		var params = {
+			id: id,
+			status: "refuse",
+			reason: $("#refuseReason").val()
+		};
+
+		fsApi.auditRecruit(params, function(data){
+			if (data.code == "00") {
+				alert("已审核拒绝");
+				location.reload();
+			} else {
+				alert(data.msg);
+			}
+		});
+	});
+}
+
+
+</script>
+
+</head>
+<body>
+	<div class="main-head detail container-fluid">
+		<h3>后台管理系统-招募详情</h3>
+	</div>
+
+	<div class="container-fluid">
+		<div class="main-view-detail">
+			<div class="row">
+				<div class="col-md-3">姓名</div>
+				<div class="col-md-9" id="name"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">性别</div>
+				<div class="col-md-9" id="sexstr"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">年龄</div>
+				<div class="col-md-9" id="age"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">居住地</div>
+				<div class="col-md-9" id="live_address"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">身份证号码</div>
+				<div class="col-md-9" id="cert_no"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">身份证照片</div>
+				<div class="col-md-9" id="cert_img"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">手机号</div>
+				<div class="col-md-9" id="contact_mobile"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">QQ号</div>
+				<div class="col-md-9" id="contact_qq"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">微信号</div>
+				<div class="col-md-9" id="contact_weixin"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">所学门派</div>
+				<div class="col-md-9" id="school"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">相关经历</div>
+				<div class="col-md-9" id="experience"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">所获成就</div>
+				<div class="col-md-9" id="achievement"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">擅长领域</div>
+				<div class="col-md-9" id="good_at"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">目前职业</div>
+				<div class="col-md-9" id="profession"></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3">是否已签约其他平台</div>
+				<div class="col-md-9" id="sign_other"></div>
+			</div>
+		</div>
+		<div class="foot-opbar">
+			<div id="baropr" style="display:none;">
+				<button class="btn btn-primary" data-toggle="modal" data-target="#modalApprove">审核通过</button>
+				<button class="btn btn-danger" data-toggle="modal" data-target="#modalReject">审核拒绝</button>
+			</div>
+			<div id="barinfo" style="display:none;"></div>
+		</div>
+	</div>
+
+	<div class="modal fade" tabindex="-1" role="dialog" id="modalApprove">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title">审核通过确认</h4>
+				</div>
+				<div class="modal-body">
+					<h5>请输入通过理由</h5>
+					<textarea rows="3" id="approveReason"></textarea>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">再考虑一下</button>
+					<button type="button" class="btn btn-primary" id="btnApprove">确认通过</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="modal fade" tabindex="-1" role="dialog" id="modalReject">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title">审核拒绝确认</h4>
+				</div>
+				<div class="modal-body">
+					<h5>请输入拒绝理由</h5>
+					<textarea rows="3" id="refuseReason"></textarea>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">再考虑一下</button>
+					<button type="button" class="btn btn-primary" id="btnRefuse">确认拒绝</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
