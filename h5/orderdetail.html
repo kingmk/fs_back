@@ -7,19 +7,469 @@
 <title>雷门易后台-订单列表</title>
 <link href="../css/bootstrap.min.css" rel="stylesheet">
 <link href="../css/bootstrap-datepicker.min.css" rel="stylesheet">
-<link href="../css/styles_h5.css?v=201708191235" rel="stylesheet">
+<link href="../css/styles_h5.css?v=201708201537" rel="stylesheet">
 
 <script src="../js/jquery-1.11.3.min.js"></script>
 <script src="../js/bootstrap.js"></script>
 <script src="../js/bootstrap-pagination.js"></script>
 <script src="../js/bootstrap-datepicker.min.js"></script>
-<script src="../js/common.js?t=5"></script>
+<script src="../js/common.js?v=201708201647"></script>
 <script src="../js/fsapi.js?v=201708191305"></script>
 
+<style type="text/css">
+body {padding-top: 60px;background-color: #eee;}
+.bar-top {position: fixed; top: 0; width: 100%; height: 60px; border-bottom: 1px solid #ccc; background-color: #e2ecf5;}
+.bar-top-left {float: left; padding: 10px 0px 10px 15px; }
+.bar-top-right {float: right; padding: 10px 15px 10px 0px; }
+.bar-top-left .detail-goods-name {font-size: 14px; font-weight: bold;}
+.bar-top-left .detail-pay {font-size: 12px; color: #999;}
+.bar-top .status {background-color: #fff; padding: 0 4px; display: inline-block; border-radius: 3px; font-size: 12px; line-height: 18px; margin-top: 4px;}
+.bar-top .status.pay_succ {background-color: #9f9; }
+.bar-top .status.init,.baseinfo .status.pay_fail {background-color: #ccc;}
+.bar-top .status.refund_applied,.baseinfo .status.refunded {background-color: #f33; color: #fff;}
+.bar-top .status.completed,.baseinfo .status.settlement {background-color: #33f; color: #fff;}
+
+.bar-top button {white-space: initial; width: 50px; font-size: 12px; padding: 4px; line-height: 14px;}
+
+.extroinfo-title {color: #337ab7; line-height: 28px;}
+.extroinfo-data {font-size: 12px; line-height: 22px;}
+
+
+.chat {padding: 15px; font-size: 12px; }
+.chat .user {width: 80px; text-align: center; padding: 10px; box-sizing: border-box; border-radius: 5px; line-height: 24px;}
+.chat.buyer .user {float: left; background-color: #ccf;}
+.chat.seller .user {float: right; background-color: #cfc;}
+.chat .content .info { padding: 10px; background-color: #fff; border-radius: 5px; line-height: 24px;}
+.chat.buyer .content {margin-left: 90px; }
+.chat.seller .content {margin-right: 90px;}
+.chat.buyer .content .info {float: left; }
+.chat.seller .content .info {float: right;}
+.chat .content img {max-height: 80px;}
+.chat .content .time {width: 100%; margin: 5px 10px; font-size: 10px; color: #999; box-sizing: border-box;}
+.chat.buyer .content .time {float:left; text-align: left;}
+.chat.seller .content .time {float:right; text-align: right;}
+
+textarea {width: 100%; border:1px solid #ccc; border-radius: 4px; }
+</style>
+
+<script type="text/javascript">
+var orderId = -1;
+var order = null;
+var evaluate = null;
+var statusStr = {"effect":"生效","del":"作废"};
+$(document).ready(function(){
+	orderId = commonUtils.getUrlParamURI("id");
+	fsApi.orderDetail({id:orderId}, function(data){
+		console.log(data);
+		order = data.order;
+		order.buyer = data.buy_usr;
+		order.seller = data.seller_usr;
+		evaluate = data.evaluate;
+		if (evaluate) {
+			evaluate.resp_speed = parseInt(evaluate.resp_speed);
+			evaluate.major_level = parseInt(evaluate.major_level);
+			evaluate.service_attitude = parseInt(evaluate.service_attitude);
+			evaluate.avg = (evaluate.resp_speed+evaluate.major_level+evaluate.service_attitude)/3;
+		};
+		initBaseInfo();
+		showChats(data.chats, order);
+	})
+})
+
+function initBaseInfo() {
+	var domBase = $(".bar-top");
+	var domLeft = $('<div class="bar-top-left"></div>');
+	domLeft.append($('<div><span class="detail-goods-name">'+order.goods_name+'</span><span class="detail-pay">￥'+commonUtils.numberCurrencyFix(order.pay_rmb_amt/100)+'</span></div>'));
+	domLeft.append($('<div class="status '+order.status+'">'+order_status_map[order.status]+'</div>'));
+	domBase.append(domLeft);
+
+	domLeft = $('<div class="bar-top-left"></div>');
+	var extroinfo = JSON.parse(order.order_extra_info);
+	if (extroinfo) {
+		domLeft.append($('<button class="btn btn-default" data-toggle="modal" data-target="#modalExtraInfo">资料<br/>已填写</button>'));
+	} else {
+		domLeft.append($('<button class="btn btn-warning" data-toggle="modal" data-target="#modalExtraInfo">资料<br/>未填写</button>'));
+	}
+
+	initExtraInfo(order.goods_name, JSON.parse(order.order_extra_info));
+	domBase.append(domLeft);
+
+	var domRight = $('<div class="bar-top-right"></div>');
+	if (order.status == "refund_applied") {
+		domRight.append($('<button class="btn btn-danger" data-toggle="modal" data-target="#modalRefundProc">有退款待处理</button>'));
+		initRefundModal();
+	} else if (order.status == "refunded" || order.status== "refund_fail" || order.status == "refunding" || (order.status=="completed" && order.refund_apply_time && order.refund_apply_time.length > 0)) {
+		domRight.append($('<button class="btn btn-default" data-toggle="modal" data-target="#modalRefundRlt">有退款已处理</button>'));
+		initRefundRlt();
+	}
+	domBase.append(domRight);
+
+	domRight = $('<div class="bar-top-right"></div>');
+	if (evaluate) {
+		domRight.append($('<button class="btn btn-primary" data-toggle="modal" data-target="#modalEvaluate">查评价<br/>'+commonUtils.numberCurrencyFix(evaluate.avg)+'</button>'));
+		initEvaluate();
+
+	} else {
+		domRight.append($('<button class="btn btn-disable">用户未评价</button>'));
+	}
+	domBase.append(domRight);
+}
+
+function initExtraInfo(goods_name, extroinfo) {
+	var domExtra = $("#modalExtraInfo .modal-body");
+	if (!extroinfo) {
+		domExtra.html('用户尚未提交信息<br/>可以联系用户：<a href="tel://'+order.buyer.register_mobile+'">'+order.buyer.register_mobile+'</a>');
+		return;
+	};
+	var formStruct = orderUtils.mapExtraInfo(goods_name);
+	var domInfo = $('<div class="extroinfo_detail"></div>');
+	for (var i = 0; i < formStruct.length; i++) {
+		var formSet = formStruct[i];
+		var domSet = $('<div class="extroinfo_set"></div>');
+		domSet.append($('<div class="extroinfo-title">'+formSet.title+'</div>'));
+		if (extroinfo[formSet.index]) {
+			var strs = [];
+			for (var j = 0; j < formSet.data.length; j++) {
+				var formField = formSet.data[j];
+				strs.push(formField.title+": "+extroinfo[formSet.index][formField.fieldname]||"无");
+			};
+			domSet.append($('<div class="extroinfo-data">'+strs.join("<br/>")+'</div>'));
+		} else {
+			domSet.append($('<div class="extroinfo-data">未填写</div>'));
+		}
+
+		domInfo.append(domSet);
+	};
+	domExtra.append(domInfo);
+}
+
+function initEvaluate() {
+	$("#resp-sel").dropdown().on("changeSelect", function(e) {
+	});
+	$("#major-sel").dropdown().on("changeSelect", function(e) {
+	});
+	$("#attitude-sel").dropdown().on("changeSelect", function(e) {
+	});
+	$("#modalEvaluate").on("show.bs.modal", function(event) {
+		var dom = $(event.relatedTarget);
+		var domModal = $(this);
+
+		domModal.find("#evaid").val(evaluate.id);
+
+		domModal.find("#evaluate_word").val(evaluate.evaluate_word);
+
+		domModal.find("#eva-time").text(evaluate.create_time);
+		// var domStatus = domModal.find("#status-sel .value");
+		// domStatus.attr("data-value", evaluate.status);
+		// domStatus.text(statusStr[evaluate.status]);
+
+		var domResp = domModal.find("#resp-sel .value");
+		domResp.attr("data-value", evaluate.resp_speed);
+		domResp.text(evaluate.resp_speed);
+
+		var domMajor = domModal.find("#major-sel .value");
+		domMajor.attr("data-value", evaluate.major_level);
+		domMajor.text(evaluate.major_level);
+
+		var domAttitude = domModal.find("#attitude-sel .value");
+		domAttitude.attr("data-value", evaluate.service_attitude);
+		domAttitude.text(evaluate.service_attitude);
+	});
+
+	$("#btnEvaUpdate").click(function(){
+		var domModal = $("#modalEvaluate");
+		// var status = domModal.find("#status-sel .value").attr("data-value");
+		var status = "effect";
+		var resp_speed = domModal.find("#resp-sel .value").attr("data-value");
+		var major_level = domModal.find("#major-sel .value").attr("data-value");
+		var service_attitude = domModal.find("#attitude-sel .value").attr("data-value");
+		var evaluate_word = domModal.find("#evaluate_word").val();
+
+		var params = {
+			id: evaluate.id,
+			status: status,
+			resp_speed: resp_speed,
+			major_level: major_level,
+			service_attitude: service_attitude,
+			evaluate_word: evaluate_word
+		}
+		console.log(params);
+
+		fsApi.updateOrderEvaluate(params, function(data){
+			if (data.code == "00") {
+				alert("修改成功");
+				location.reload();
+			} else {
+				alert("修改失败，请稍后重试");
+			}
+		})
+	})
+
+	$("#btnEvaDel").click(function(){
+		fsApi.deleteOrderEvaluate({id:evaluate.id}, function(data){
+			if (data.code == "00") {
+				alert("修改成功");
+				location.reload();
+			} else {
+				alert("修改失败，请稍后重试");
+			}
+		})
+	})
+}
+
+function initRefundModal() {
+	$("#modalRefundProc").find("#ref-apply-time").text(order.refund_apply_time);
+	$("#modalRefundProc").find("#ref-apply-reason").text(order.refund_reason);
+	$("#btnRefundApprove").click(function(){
+		var params = {
+			id: orderId,
+			isAgree: "Y",
+			reason: $("#audit_word").val().trim()
+		};
+
+		if (params.reason.length == 0) {
+			alert("处理理由必须填写");
+			return;
+		};
+
+		fsApi.auditRefund(params, function(data){
+			if (data.code == "00") {
+				alert("已退款");
+				location.reload();
+			} else {
+				alert(data.msg);
+			}
+		});
+	});
+	$("#btnRefundReject").click(function(){
+		var params = {
+			id: orderId,
+			isAgree: "N",
+			reason: $("#audit_word").val()
+		};
+
+		if (params.reason.length == 0) {
+			alert("处理理由必须填写");
+			return;
+		};
+
+		fsApi.auditRefund(params, function(data){
+			if (data.code == "00") {
+				alert("已拒绝退款");
+				location.reload();
+			} else {
+				alert(data.msg);
+			}
+		});
+	});
+}
+
+function initRefundRlt() {
+	$("#modalRefundRlt").find("#ref-rlt-apply-time").text(order.refund_apply_time);
+	$("#modalRefundRlt").find("#ref-rlt-reason").text(order.refund_reason);
+	$("#modalRefundRlt").find("#ref-rlt-proc-time").text(order.refund_audit_time);
+	$("#modalRefundRlt").find("#ref-rlt-auditword").text(order.refund_audit_word);
+
+}
+
+function showChats(chats, order) {
+	var domChats = $(".chats");
+	for (var i = 0; i < chats.length; i++) {
+		var chat = chats[i];
+		var domChat = $('<div class="chat clearfix"></div>');
+		var role = "";
+		var username = "";
+		if (chat.sent_usr_id == order.buyer.id) {
+			domChat.addClass("buyer");
+			role = "用户";
+			username = (order.buyer.real_name?order.buyer.real_name:"匿名客户")+"<br/>(用户)";
+		} else {
+			domChat.addClass("seller");
+			role = "老师";
+			username = order.seller.real_name+"<br/>(老师)";
+			if (order.seller.nick_name) {
+				username += "<br/>("+order.seller.nick_name+")";
+			};
+		}
+		domChat.append($('<div class="user">'+username+'</div>'));
+		var domContent = $('<div class="content clearfix"></div>');
+		if (chat.msg_type == "text") {
+			domContent.append($('<div class="info">'+chat.content+'</div>'));
+		} else if (chat.msg_type == "img") {
+			domContent.append($('<div class="info"><a href="'+chat.content+'"><img src="'+chat.content+'"></a></div>'));
+		}
+		var date = new Date(chat.create_time.replace(/-/g, "/"));
+		domContent.append($('<div class="time">'+date.format("MM-dd hh:mm")+'</div>'));
+		domChat.append(domContent);
+		domChats.append(domChat);
+	};
+
+}
+</script>
 
 </head>
 
 <body>
+	<div class="bar-top clearfix">
+	</div>
+	<div class="chats"></div>
+	<div class="modal fade" tabindex="-1" role="dialog" id="modalExtraInfo">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title">用户所填资料</h4>
+				</div>
+				<div class="modal-body">
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+				</div>
+			</div>
+		</div>
+	</div>
 
+	<div class="modal fade" tabindex="-1" role="dialog" id="modalEvaluate">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title">用户评价</h4>
+				</div>
+				<div class="modal-body">
+					<input id="evaid" style="display:none;"/>
+					<!-- <div class="form-line">
+						<div class="form-title">评价状态</div>
+						<div class="form-input input-group dropdown">
+							<button class="btn btn-default dropdown-toggle"  id="status-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="effect">生效</span><span class="caret"></span>
+							</button>
+							<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+								<li><a data-value="effect">生效</a></li>
+								<li><a data-value="del">作废</a></li>
+							</ul>
+						</div>
+					</div> -->
+					<div class="form-line clearfix">
+						<div class="form-title">评价时间</div>
+						<div class="form-input form-text" id="eva-time"></div>
+					</div>
+					<div class="form-line clearfix">
+						<div class="form-title">响应速度</div>
+						<div class="form-input input-group dropdown">
+							<button class="btn btn-default dropdown-toggle"  id="resp-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="5">5</span><span class="caret"></span>
+							</button>
+							<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+								<li><a data-value="1">1</a></li>
+								<li><a data-value="2">2</a></li>
+								<li><a data-value="3">3</a></li>
+								<li><a data-value="4">4</a></li>
+								<li><a data-value="5">5</a></li>
+							</ul>
+						</div>
+					</div>
+					<div class="form-line clearfix">
+						<div class="form-title">专业水平</div>
+						<div class="form-input input-group dropdown">
+							<button class="btn btn-default dropdown-toggle"  id="major-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="5">5</span><span class="caret"></span>
+							</button>
+							<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+								<li><a data-value="1">1</a></li>
+								<li><a data-value="2">2</a></li>
+								<li><a data-value="3">3</a></li>
+								<li><a data-value="4">4</a></li>
+								<li><a data-value="5">5</a></li>
+							</ul>
+						</div>
+					</div>
+					<div class="form-line clearfix">
+						<div class="form-title">服务态度</div>
+						<div class="form-input input-group dropdown">
+							<button class="btn btn-default dropdown-toggle"  id="attitude-sel" type="button"data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="value" data-value="5">5</span><span class="caret"></span>
+							</button>
+							<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+								<li><a data-value="1">1</a></li>
+								<li><a data-value="2">2</a></li>
+								<li><a data-value="3">3</a></li>
+								<li><a data-value="4">4</a></li>
+								<li><a data-value="5">5</a></li>
+							</ul>
+						</div>
+					</div>
+					<div class="form-line clearfix">
+						<div class="form-title">评价内容</div>
+						<div class="form-input">
+							<textarea rows="5" id="evaluate_word"></textarea>
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+					<button type="button" class="btn btn-primary" id="btnEvaUpdate">确认修改</button>
+					<button type="button" class="btn btn-warning" id="btnEvaDel">删除</button>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="modal fade" tabindex="-1" role="dialog" id="modalRefundProc">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title">用户退款申请处理</h4>
+				</div>
+				<div class="modal-body">
+					<div class="form-line clearfix">
+						<div class="form-title">申请时间</div>
+						<div class="form-input form-text" id="ref-apply-time"></div>
+					</div>
+					<div class="form-line clearfix">
+						<div class="form-title">退款理由</div>
+						<div class="form-input form-text" id="ref-apply-reason"></div>
+					</div>
+					<div class="form-line clearfix">
+						<div class="form-title">处理理由</div>
+						<div class="form-input">
+							<textarea rows="4" id="audit_word"></textarea>
+						</div>
+					</div>
+
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+					<button type="button" class="btn btn-primary" id="btnRefundApprove">同意退款</button>
+					<button type="button" class="btn btn-warning" id="btnRefundReject">拒绝退款</button>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="modal fade" tabindex="-1" role="dialog" id="modalRefundRlt">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title">用户退款处理结果</h4>
+				</div>
+				<div class="modal-body">
+					<div class="form-line clearfix">
+						<div class="form-title">申请时间</div>
+						<div class="form-input form-text" id="ref-rlt-apply-time"></div>
+					</div>
+					<div class="form-line clearfix">
+						<div class="form-title">退款理由</div>
+						<div class="form-input form-text" id="ref-rlt-reason"></div>
+					</div>
+					<div class="form-line clearfix">
+						<div class="form-title">处理时间</div>
+						<div class="form-input form-text" id="ref-rlt-proc-time"></div>
+					</div>
+					<div class="form-line clearfix">
+						<div class="form-title">处理理由</div>
+						<div class="form-input form-text" id="ref-rlt-auditword"></div>
+					</div>
+
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+				</div>
+			</div>
+		</div>
+	</div>
 </body>
 </html>

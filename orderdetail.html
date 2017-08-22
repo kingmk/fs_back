@@ -43,7 +43,7 @@ textarea {width: 100%; border:1px solid #ccc; border-radius: 4px;}
 
 <script src="js/jquery-1.11.3.min.js"></script>
 <script src="js/bootstrap.js"></script>
-<script src="js/common.js"></script>
+<script src="js/common.js?v=201708201647"></script>
 <script src="js/fsapi.js?v=201708131402"></script>
 <script type="text/javascript">
 var orderId = -1;
@@ -76,7 +76,7 @@ function initBaseInfo(order){
 
 	if (order.status == "refund_applied") {
 		showRefundOp(order);
-	} else if (order.status == "refunded" || order.status== "refund_fail" || order.status == "refunding") {
+	} else if (order.status == "refunded" || order.status== "refund_fail" || order.status == "refunding" || (order.status=="completed" && order.refund_apply_time && order.refund_apply_time.length > 0)) {
 		showRefundRlt(order);
 	}
 }
@@ -259,7 +259,7 @@ function showChats(chats, order) {
 		if (chat.msg_type == "text") {
 			domContent.append($('<div class="info">'+chat.content+'</div>'));
 		} else if (chat.msg_type == "img") {
-			domContent.append($('<div class="info"><img src="'+chat.content+'"></div>'));
+			domContent.append($('<div class="info"><a href="'+chat.content+'" target="_blank"><img src="'+chat.content+'"></a></div>'));
 		}
 		var date = new Date(chat.create_time);
 		domContent.append($('<div class="time">'+date.format("MM-dd hh:mm")+'</div>'));
@@ -273,7 +273,7 @@ function showExtraInfo(goods_name, extroinfo) {
 		$(".extroinfo").text("用户尚未提交信息");
 		return;
 	};
-	var formStruct = mapExtraInfo(goods_name);
+	var formStruct = orderUtils.mapExtraInfo(goods_name);
 	var domInfo = $('<div class="extroinfo_detail"></div>');
 	for (var i = 0; i < formStruct.length; i++) {
 		var formSet = formStruct[i];
@@ -295,221 +295,6 @@ function showExtraInfo(goods_name, extroinfo) {
 	$(".extroinfo").append(domInfo);
 }
 
-function mapExtraInfo(goods_name) {
-	var formData = [];
-	switch(goods_name) {
-		case "流年运势":
-		case "婚恋感情":
-		case "健康事业财运":
-		case "八字详批":
-		case "命运祥批":
-		{
-			formData = [{
-				title: "咨询人信息",
-				index: 0,
-				data: [
-					{title: "中文姓名", fieldname: "realName"},
-					{title: "英文姓名", fieldname: "englishName"},
-					{title: "性别", fieldname: "sex"},
-					{title: "公历出生日期", fieldname: "birthDate"},
-					{title: "出生时刻", fieldname: "birthTimeText"},
-					{title: "出生地", fieldname: "birthAddress"},
-					{title: "婚姻状况", fieldname: "marriageStatus"},
-					{title: "家中排行", fieldname: "familyRank"}
-				]
-			}];
-			break;
-		}
-		case "个人改名":
-		{
-			formData = [{
-				title: "改名人信息",
-				index: 0,
-				data: [
-					{title: "中文姓名", fieldname: "realName"},
-					{title: "曾用名", fieldname: "onceName"},
-					{title: "性别", fieldname: "sex"},
-					{title: "公历出生日期", fieldname: "birthDate"},
-					{title: "出生时刻", fieldname: "birthTimeText"},
-					{title: "出生地", fieldname: "birthAddress"},
-					{title: "婚姻状况", fieldname: "marriageStatus"},
-					{title: "家中排行", fieldname: "familyRank"}
-				]
-			}]
-			break;
-		}
-		case "个人起名":
-		{
-			formData = [{
-				title: "起名人信息",
-				index: 0,
-				data: [
-					{title: "性别", fieldname: "sex"},
-					{title: "公历出生日期", fieldname: "birthDate"},
-					{title: "出生时刻", fieldname: "birthTimeText"},
-					{title: "出生地", fieldname: "birthAddress"},
-					{title: "家中排行", fieldname: "familyRank"},
-					{title: "哥哥姓名", fieldname: "brotherName"},
-					{title: "姐姐姓名", fieldname: "sisterName"}
-				]
-			}];
-			break;
-		}
-		case "公司起名":
-		{
-			formData = [{
-				title: "企业信息",
-				index: 0,
-				data: [
-					{title: "成立时间", fieldname: "establishedDate"},
-					{title: "所处行业", fieldname: "industry"},
-					{title: "主营业务", fieldname: "scopeOfBusiness"},
-					{title: "所在地", fieldname: "comAddress"},
-					{title: "现用名", fieldname: "curComName"}
-				]
-			}, {
-				title: "企业主信息",
-				index: 0,
-				data: [
-					{title: "姓名", fieldname: "realName"},
-					{title: "性别", fieldname: "sex"},
-					{title: "公历出生日期", fieldname: "birthDate"},
-					{title: "出生时刻", fieldname: "birthTimeText"},
-					{title: "出生地", fieldname: "birthAddress"}
-				]
-			}];
-			break;
-		}
-		case "结婚吉日":
-		{
-			formData = [{
-				title: "未婚夫",
-				index: 0,
-				data: [
-					{title: "中文姓名", fieldname: "realName"},
-					{title: "英文姓名", fieldname: "englishName"},
-					{title: "性别", fieldname: "sex"},
-					{title: "公历出生日期", fieldname: "birthDate"},
-					{title: "出生时刻", fieldname: "birthTimeText"},
-					{title: "出生地", fieldname: "birthAddress"}
-				]
-			}, {
-				title: "未婚妻",
-				index: 1,
-				data: [
-					{title: "中文姓名", fieldname: "realName"},
-					{title: "英文姓名", fieldname: "englishName"},
-					{title: "性别", fieldname: "sex"},
-					{title: "公历出生日期", fieldname: "birthDate"},
-					{title: "出生时刻", fieldname: "birthTimeText"},
-					{title: "出生地", fieldname: "birthAddress"}
-				]
-			}, {
-				title: "期望结婚日期",
-				index: 0,
-				data: [
-					{title: "期望开始日期", fieldname: "expectMarriageDateBegin"},
-					{title: "期望结束日期", fieldname: "expectMarriageDateEnd"},
-				]
-			}];
-			break;
-		}
-		case "择日生子":
-		{
-			formData = [{
-				title: "父亲信息",
-				index: 0,
-				data: [
-					{title: "中文姓名", fieldname: "realName"},
-					{title: "英文姓名", fieldname: "englishName"},
-					{title: "性别", fieldname: "sex"},
-					{title: "公历出生日期", fieldname: "birthDate"},
-					{title: "出生时刻", fieldname: "birthTimeText"},
-					{title: "出生地", fieldname: "birthAddress"}
-				]
-			}, {
-				title: "母亲信息",
-				index: 1,
-				data: [
-					{title: "中文姓名", fieldname: "realName"},
-					{title: "英文姓名", fieldname: "englishName"},
-					{title: "性别", fieldname: "sex"},
-					{title: "公历出生日期", fieldname: "birthDate"},
-					{title: "出生时刻", fieldname: "birthTimeText"},
-					{title: "出生地", fieldname: "birthAddress"}
-				]
-			}, {
-				title: "子女信息",
-				index: 0,
-				data: [
-					{title: "第几胎", fieldname: "fetusNum"}
-				]
-			}];
-			break;
-		}
-		case "开张开市":
-		{
-			formData = [{
-				title: "企业信息",
-				index: 0,
-				data: [
-					{title: "现用名", fieldname: "curComName"},
-					{title: "所处行业", fieldname: "industry"},
-					{title: "主营业务", fieldname: "scopeOfBusiness"},
-					{title: "所在地", fieldname: "comAddress"}
-				]
-			}, {
-				title: "企业主信息",
-				index: 0,
-				data: [
-					{title: "姓名", fieldname: "realName"},
-					{title: "性别", fieldname: "sex"},
-					{title: "公历出生日期", fieldname: "birthDate"},
-					{title: "出生时刻", fieldname: "birthTimeText"},
-					{title: "出生地", fieldname: "birthAddress"}
-				]
-			}];
-			break;
-		}
-		case "乔迁择日": 
-		{
-			formData = [{
-				title: "新宅信息",
-				index: 0,
-				data: [
-					{title: "新宅地址", fieldname: "newAddress"},
-					{title: "新宅落成时间", fieldname: "completedTime"},
-					{title: "期望乔迁开始时间", fieldname: "expectMoveDateBegin"},
-					{title: "期望乔迁结束时间", fieldname: "expectMoveDateEnd"}
-				]
-			},{
-				title: "主人信息",
-				index: 0,
-				data: [
-					{title: "中文姓名", fieldname: "realName"},
-					{title: "英文姓名", fieldname: "englishName"},
-					{title: "性别", fieldname: "sex"},
-					{title: "公历出生日期", fieldname: "birthDate"},
-					{title: "出生时刻", fieldname: "birthTimeText"},
-					{title: "出生地", fieldname: "birthAddress"}
-				]
-			}, {
-				title: "伴侣信息",
-				index: 1,
-				data: [
-					{title: "中文姓名", fieldname: "realName"},
-					{title: "英文姓名", fieldname: "englishName"},
-					{title: "性别", fieldname: "sex"},
-					{title: "公历出生日期", fieldname: "birthDate"},
-					{title: "出生时刻", fieldname: "birthTimeText"},
-					{title: "出生地", fieldname: "birthAddress"}
-				]
-			}];
-			break;
-		}
-	}
-	return formData;
-}
 
 </script>
 

@@ -7,17 +7,18 @@
 <title>雷门易后台-订单列表</title>
 <link href="../css/bootstrap.min.css" rel="stylesheet">
 <link href="../css/bootstrap-datepicker.min.css" rel="stylesheet">
-<link href="../css/styles_h5.css?v=201708191235" rel="stylesheet">
+<link href="../css/styles_h5.css?v=201708201552" rel="stylesheet">
 
 <script src="../js/jquery-1.11.3.min.js"></script>
 <script src="../js/bootstrap.js"></script>
 <script src="../js/bootstrap-pagination.js"></script>
 <script src="../js/bootstrap-datepicker.min.js"></script>
-<script src="../js/common.js?t=5"></script>
-<script src="../js/fsapi.js?v=201708191305"></script>
+<script src="../js/common.js?v=201708201647"></script>
+<script src="../js/fsapi.js?v=201708201305"></script>
 
 <style type="text/css">
-#btn_search {position: absolute; bottom: 0; right: 0;}
+body {padding-bottom: 60px;}
+#btn_search {position: absolute; bottom: 0; right: 5px;}
 .order-stat {margin:20px 0;}
 .order-stat .number {font-weight: bold; color:#337ab7; font-size: 18px;}
 
@@ -30,6 +31,9 @@
 .order-block .order-right {position: absolute; right: 15px; top: 5px; line-height: 24px; text-align: right;}
 .order-block .order-right .order-status {color: #337ab7; font-size: 14px;}
 .order-block .order-right .order-eva {color: #337ab7;}
+
+.refund-info {background-color: #f04807; height: 40px; line-height: 40px; color: #fff; padding: 0 15px; margin-top: -10px; margin-bottom: 10px;}
+.refund-info .btn {margin-left: 30px; height: 30px; line-height: 30px; padding: 0 10px;}
 </style>
 
 <script type="text/javascript">
@@ -85,9 +89,44 @@ $(document).ready(function() {
 	});
 
 
+	countRefunding();
 	fetchList();
 });
 
+function resetSearch() {
+	var domStatus = $("#status-sel .value");
+	domStatus.attr("data-value","default");
+	domStatus.html("默认");
+
+	$("#date-create-start").val("");
+	$("#date-create-end").val("");
+	searchParams = {
+		buy_usr_name: "",
+		seller_usr_name: "",
+		goods_name: "",
+		create_time_start: "",
+		create_time_end: "",
+		status: "default",
+		curpage: 0,
+		pagesize: 20
+	};
+}
+
+function countRefunding() {
+	fsApi.countRefundOrder({}, function(data) {
+		if (data.total > 0) {
+			$(".refund-info").show();
+			$("#btn_refund").click(function() {
+				resetSearch();
+				searchParams.status = "refund_applied";
+				var domStatus = $("#status-sel .value");
+				domStatus.attr("data-value","refund_applied");
+				domStatus.html("退款申请中");
+				fetchList();
+			});
+		};
+	});
+}
 
 function fetchList() {
 
@@ -129,7 +168,7 @@ function updateList(data) {
 }
 
 function createOrderBlock(order) {
-	var domOrder = $('<div class="order-block"></div>');
+	var domOrder = $('<div class="order-block" data-id="'+order.id+'"></div>');
 	var buyername = (order.buy_usr_name?order.buy_usr_name:"匿名客户");
 	var domTmp1 = $('<div><span class="user-name">'+buyername+'</span>（<a class="user-mobile" href="tel://'+order.buy_usr_mobile+'">'+order.buy_usr_mobile+'</a>）咨询&nbsp;<span class="user-name">'+order.seller_usr_name+'</span></div>');
 	domOrder.append(domTmp1);
@@ -147,6 +186,12 @@ function createOrderBlock(order) {
 		domRight.append($('<div class="info-alert">[资料未填写]</div>'));
 	}
 	domOrder.append(domRight);
+
+	domOrder.click(function() {
+		var id = $(this).attr("data-id");
+
+		location.href = "orderdetail.html?id="+id+"&t="+(new Date()).getTime();
+	})
 
 	return domOrder;
 }
@@ -170,6 +215,7 @@ function createEvaluateDom(order) {
 </head>
 
 <body>
+	<div class="refund-info" style="display:none;">当前有退款订单<button id="btn_refund" class="btn btn-warning">立即查看</button></div>
 	<div class="container-fluid">
 		<div class="form-group">
 			<div class="form-title">下单日期：</div>
@@ -205,7 +251,7 @@ function createEvaluateDom(order) {
 		<div class="order-stat"></div>
 	</div>
 	<div id="orderlist" class="order-list"></div>
-	<div class="pagination" id="pagination"></div>
+	<div class="bar-foot clearfix"><div class="pagination" id="pagination"></div></div>
 
 </body>
 </html>

@@ -1,13 +1,13 @@
 var FsApi = function() {
 	// for online
-	this.host = "/interface";
+	// this.host = "/interface";
 	this.loginUrl = "/login.html";
 	this.serverhost = "http://leimenyi.com.cn/"
 
 	// for test
-	// this.host = "/fs/interface";
+	this.host = "/fs_back/interface";
 	// this.serverhost = "http://haozhao.xicp.net/";
-	// this.loginUrl = "/fs/login.html";
+	// this.loginUrl = "/fs_back/login.html";
 	this.apiCall = function(path, type, params, callback) {
 		var self = this;
 		$.ajax({
